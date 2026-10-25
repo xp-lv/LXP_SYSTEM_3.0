@@ -14,6 +14,7 @@ import {getIslands,getWorldIsland,treeColorOf} from './world.js';
 import {islandRadiusOf} from './slots.js';
 import {derive} from './data.js';
 import {rebuild} from './tree.js';
+import {store} from './store.js';
 import {STAGE} from './demo/stage.js';
 import {setEnvFocus} from './demo/env.js';
 import * as q from './queries.js';
@@ -673,7 +674,7 @@ var _backlog=null;
 export function openBacklogPanel(){
   closeBacklogPanel();
   var t0=today();
-  var vw=weekKeyOf(parse(_viewDay||t0.d));      /* 与呈现中的落叶堆同周（05.4） */
+  var vw=weekKeyOf(parse(t0.d));               /* 落叶堆按真实今天常驻 */
   var ls=q.leafPile(treeRoots(),data.temps,weekDays(vw)[0],t0.d);
   var el=document.createElement('div');el.id='backlogPanel';
   el.innerHTML='<div class="bl-head">落叶堆 \u00b7 本周前的欠账 '+ls.length+' 项 \u00b7 点击选补点</div>'+
@@ -786,7 +787,7 @@ function ensureStageRock(){
   STAGE.treeZ=mini.center.z;
 }
 /* 启动即定位到世界岛上的卫星岛（不新增岛体） */
-export function initTodayStage(){ensureStageRock()}
+export function initTodayStage(){ensureStageRock();refreshLeafPile(true)}
 
 /* ---------- 落果 3D（05.3：树下散果，点击开补点） ---------- */
 function buildFallenFruits(list){
@@ -968,6 +969,37 @@ function removeLeafPile(){
   if(_pileMoundGeo){_pileMoundGeo.dispose();_pileMoundGeo=null}
 }
 
+/* ---------- 落叶堆常驻：按真实今天的历史欠账构建，离开今日不销毁 ---------- */
+var _pileSig='',_pileTimer=null;
+function leafPileList(){
+  var t0=today();
+  var vw=weekKeyOf(parse(t0.d));
+  return q.leafPile(treeRoots(),data.temps,weekDays(vw)[0],t0.d);
+}
+function leafPileSig(list){
+  return list.map(function(n){return n.id}).sort(function(a,b){return a-b}).join('|');
+}
+function registerPilePicks(){
+  if(!_pileGroup)return;
+  _pileGroup.traverse(function(o){
+    if(o.userData&&o.userData.pick&&pickMeshes.indexOf(o)<0)pickMeshes.push(o);
+  });
+}
+function refreshLeafPile(force){
+  if(!_stageBody)return;
+  registerPilePicks();
+  var list=leafPileList();
+  var sig=leafPileSig(list);
+  if(!force&&sig===_pileSig&&(sig===''||_pileGroup))return;
+  _pileSig=sig;
+  buildLeafPile(list);
+}
+function scheduleLeafPileRefresh(){
+  if(_pileTimer)clearTimeout(_pileTimer);
+  _pileTimer=setTimeout(function(){_pileTimer=null;refreshLeafPile()},220);
+}
+store.on('data',function(){registerPilePicks();scheduleLeafPileRefresh()});
+
 export function enterToday(){
   var el=document.getElementById('viewToday');
   if(!el)return;
@@ -997,7 +1029,7 @@ export function enterToday(){
   vroot._groundY=_stageHeightAt?_stageHeightAt(_treeX,_treeZ):STAGE.groundY;
   rebuild();
   buildFallenFruits(q.fallenFruits(treeRoots(),data.temps,vw,t0.d));
-  buildLeafPile(q.leafPile(treeRoots(),data.temps,weekDays(vw)[0],t0.d));
+  refreshLeafPile();
   try{setEnvFocus(STAGE.x,STAGE.groundY+20,STAGE.z,STAGE.R0*1.7)}catch(e){}
   frameToday();                        /* 只改取景：焦点从大岛移到小岛 */
   /* 渲染 DOM */
@@ -1053,13 +1085,13 @@ export function leaveToday(){
   /* 执行区状态保留（05.6 v10）——切视图不清空，计时以 startedAt 续算。
      小岛常驻场景：离开今日只把取景与环境焦点交还世界岛。 */
   removeFallenFruits();
-  removeLeafPile();
   var wi2=getWorldIsland();
   if(_inToday){
     _inToday=false;
     data.root=_savedRoot;
     _savedRoot=null;
     rebuild();
+    refreshLeafPile();
     if(wi2&&wi2.boundingBox){
       /* 恢复世界取景（自适应岛幅，瞄准岛盘中心） */
       var R=wi2._R||islandRadiusOf(wi2);
