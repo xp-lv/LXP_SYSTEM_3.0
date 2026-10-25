@@ -756,6 +756,16 @@ function stageGround(x,z){
   const h=_stageBody.heightAt(lx,lz);
   return h==null?STAGE.y:(_stageBody.position.y+h)*s;
 }
+/* 舞台落点约束：小岛是有限的，落果/落叶不能沿树继续扇到岛外 */
+function stageClamp(x,z,maxR){
+  var dx=x-STAGE.x,dz=z-STAGE.z,d=Math.hypot(dx,dz);
+  if(d>maxR){x=STAGE.x+dx/d*maxR;z=STAGE.z+dz/d*maxR}
+  return{x:x,z:z};
+}
+function stageY(x,z){
+  var y=_stageHeightAt?_stageHeightAt(x,z):STAGE.groundY;
+  return y==null?STAGE.groundY:y;
+}
 function ensureStageRock(){
   const isl=getWorldIsland();
   const mini=isl&&isl._body&&isl._body.mini;
@@ -784,13 +794,17 @@ function buildFallenFruits(list){
   if(!list||!list.length)return;
   var g=new THREE.Group();
   var n=Math.min(list.length,40);
+  var s=_stageBody?_stageBody.scale:1;
+  var maxR=(STAGE.R0||300)*.88;
+  var tx=STAGE.treeX!=null?STAGE.treeX:STAGE.x;
+  var tz=STAGE.treeZ!=null?STAGE.treeZ:STAGE.z;
   var cols=[0xD97618,0xC25A2B,0xE8A44C];
   for(var i=0;i<n;i++){
     var m=new THREE.Mesh(new THREE.SphereGeometry(2.6,10,8),
       new THREE.MeshStandardMaterial({color:new THREE.Color(cols[i%3]).convertSRGBToLinear(),roughness:.7,flatShading:true}));
-    var a=Math.random()*Math.PI*2,r=30+Math.random()*45;
-    var x=(STAGE.treeX!=null?STAGE.treeX:STAGE.x)+Math.cos(a)*r,z=(STAGE.treeZ!=null?STAGE.treeZ:STAGE.z)+Math.sin(a)*r*.8;
-    m.position.set(x,(_stageHeightAt?_stageHeightAt(x,z):STAGE.groundY)+1+Math.random()*1.5,z);
+    var a=Math.random()*Math.PI*2,r=.16*s+Math.random()*.42*s;
+    var p=stageClamp(tx+Math.cos(a)*r,tz+Math.sin(a)*r*.8,maxR);
+    m.position.set(p.x,stageY(p.x,p.z)+1+Math.random()*1.5,p.z);
     m.userData.pick={kind:'fallen',node:list[i]};   /* 真实任务节点：补点写真数据（R17） */
     pickMeshes.push(m);
     g.add(m);
@@ -809,32 +823,55 @@ function removeFallenFruits(){
   });
   scene.remove(_fruitGroup);_fruitGroup=null;
 }
-/* ---------- 落叶堆 3D（05.3：左侧地面，点击回看欠账） ---------- */
-var _pileGeo=null;
+/* ---------- 落叶堆 3D（05.3：树旁外缘地面，点击回看欠账） ---------- */
+var _pileGeo=null,_pileMoundGeo=null;
 function buildLeafPile(list){
   removeLeafPile();
   if(!list||!list.length)return;
   var g=new THREE.Group();
-  var n=Math.min(list.length,60);
+  var s=_stageBody?_stageBody.scale:1;
+  var maxR=(STAGE.R0||300)*.90;
+  var tx=STAGE.treeX!=null?STAGE.treeX:STAGE.x;
+  var tz=STAGE.treeZ!=null?STAGE.treeZ:STAGE.z;
+  var dx=tx-STAGE.x,dz=tz-STAGE.z,dl=Math.hypot(dx,dz)||1;
+  var ox=dx/dl,oz=dz/dl;                 /* 岛心→树：向岛外 */
+  var size=Math.min(1,.55+list.length*.06);
+  var pileR=Math.min(.55*s*size,Math.max(10,maxR-dl-.22*s));
+  var pileH=.30*s*size;
+  var off=Math.min(.30*s,Math.max(0,(maxR-pileR-dl)*.8));
+  /* 向岛心收一点、再向镜头方向前移：避开左缘石头和树基遮挡 */
+  var px=tx+ox*off+.55*s,pz=tz+oz*off+2.0*s;
+  var py=stageY(px,pz);
+  /* 低矮落叶丘：先给堆一个体量，叶盘再铺在丘面与边缘 */
+  _pileMoundGeo=new THREE.SphereGeometry(1,10,6);
+  var mound=new THREE.Mesh(_pileMoundGeo,new THREE.MeshStandardMaterial({
+    color:new THREE.Color(0x4f3818).convertSRGBToLinear(),roughness:.98,
+    flatShading:true,side:THREE.DoubleSide}));
+  mound.position.set(px,py+pileH*.18,pz);
+  mound.scale.set(pileR,pileH*.55,pileR*.92);
+  mound.rotation.y=Math.random()*Math.PI*2;
+  mound.userData.pick={kind:'pile'};
+  pickMeshes.push(mound);g.add(mound);
   var cols=[0x6e4c1e,0x7d5a24,0x5f421c,0x8a6528];
-  _pileGeo=new THREE.CircleGeometry(3.6,7);    /* 共享几何体（移除时统一释放） */
+  var n=Math.min(80,Math.max(8,list.length*3));
+  _pileGeo=new THREE.CircleGeometry(5.4,7);    /* 共享几何体（移除时统一释放） */
   var geo=_pileGeo;
   for(var i=0;i<n;i++){
     var c=cols[i%cols.length];
     var m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({
       color:new THREE.Color(c).convertSRGBToLinear(),roughness:.95,
       emissive:new THREE.Color(c).convertSRGBToLinear(),emissiveIntensity:.03,side:THREE.DoubleSide}));
-    var a=Math.PI*(0.62+Math.random()*0.76);        /* 舞台左缘扇形（聚拢成"堆"而非铺满） */
-    var r=50+Math.random()*22;
-    var x=(STAGE.treeX!=null?STAGE.treeX:STAGE.x)+Math.cos(a)*r,z=(STAGE.treeZ!=null?STAGE.treeZ:STAGE.z)+Math.sin(a)*r*.8;
-    m.position.set(x,(_stageHeightAt?_stageHeightAt(x,z):STAGE.groundY)+.3+Math.random()*.5,z);
+    var a=Math.random()*Math.PI*2;
+    var r=Math.sqrt(Math.random())*pileR*1.02;
+    var p=stageClamp(px+Math.cos(a)*r,pz+Math.sin(a)*r*.92,maxR);
+    m.position.set(p.x,stageY(p.x,p.z)+pileH*(.18+Math.random()*.62),p.z);
     m.userData.pick={kind:'pile'};
     m.rotation.x=-Math.PI/2+(Math.random()-.5)*.7;
     m.rotation.z=Math.random()*Math.PI*2;
-    var s=.5+Math.random()*.55;
-    m.scale.set(s,s*(1.4+Math.random()*.5),s);
-    g.add(m);
+    var sc=.7+Math.random()*.8;
+    m.scale.set(sc,sc*(1.3+Math.random()*.45),sc);
     pickMeshes.push(m);
+    g.add(m);
   }
   scene.add(g);_pileGroup=g;
 }
@@ -847,6 +884,7 @@ function removeLeafPile(){
   });
   scene.remove(_pileGroup);_pileGroup=null;
   if(_pileGeo){_pileGeo.dispose();_pileGeo=null}
+  if(_pileMoundGeo){_pileMoundGeo.dispose();_pileMoundGeo=null}
 }
 
 export function enterToday(){

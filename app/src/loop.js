@@ -5,7 +5,7 @@ import {state,planetNodes} from './state.js';
 import {drawMap,treeGroup} from './tree.js';
 import {planetGroup,planetLinks} from './planet.js';
 import {pickNode} from './interact.js';
-import {getIslands,getWorldIsland} from './world.js';
+import {getIslands} from './world.js';
 import {updateCard} from './ui.js';
 import {stepEnv} from './demo/env.js';
 import {stepValley} from './demo/valley.js';
@@ -42,8 +42,6 @@ export function frame(){
   stepEnv(dt);                                  /* demo 环境：预设缓动/风/云/光尘 */
   stepValley(dt);                               /* 旧岛体时钟（demo 预览/回退用） */
   stepFloatingIslands(t);                       /* 浮空岛：草/水/泉/瀑布/鸟动画 */
-  const _wi=getWorldIsland();
-  if(_wi&&_wi._body&&_wi._body.mainGroup) _wi._body.mainGroup.visible = state.view!=='today';
   stepGoal(dt,t);
   stepEzTree(t);                                 /* ez-tree：断梢红光呼吸（同节奏） */                               /* demo 树：补间/红光脉冲 */
   stepGoal(dt,t);                                 /* ez-tree：断梢红光呼吸（同节奏） */
