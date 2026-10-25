@@ -1,0 +1,39 @@
+# ============================================================
+# lxp-system · 开发环境 docker-compose
+#
+# 与正式版的区别：
+#   - 源码目录挂载进容器（改代码 → 刷新浏览器即生效，不用重新 build）
+#   - 端口 8081（不占用正式版 8080）
+#   - 独立的 dev-data 卷（开发数据与正式数据隔离）
+#
+# 用法：
+#   cd deploy
+#   TOKEN=dev-token docker compose -f docker-compose.dev.yml up
+#
+# 访问：http://localhost:8081/app/
+# ============================================================
+
+services:
+  lxp-dev:
+    image: node:22-alpine
+    container_name: lxp-dev
+    working_dir: /app
+    command: sh -c "npm install --production && node server.js"
+    ports:
+      - "8081:8081"
+    environment:
+      - TOKEN=${TOKEN:-dev-token}
+      - PORT=8081
+      - NODE_ENV=development
+    volumes:
+      # 源码实时挂载：改本地文件 → 容器内立刻可见
+      - ../app:/app
+      # ez-tree 依赖（从 lxp-system/ 根目录，deploy/ 上一级）
+      - ../ez-tree:/ez-tree
+      # 开发数据（与正式数据隔离）
+      - dev-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  dev-data:
+    driver: local

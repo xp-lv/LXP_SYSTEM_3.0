@@ -1,0 +1,95 @@
+/* ============================================================
+   tokens.css — 任务树系统全局 Design Tokens（唯一色值/字号来源）
+   规范：《UI设计规范.md》· 可视化基准：demo/styleguide.html
+   用法：<link rel="stylesheet" href="src/tokens.css">
+   约定：所有组件样式只引用 --lx-* 变量，禁止出现裸色值。
+   ============================================================ */
+:root{
+  /* —— 背景（非纯黑，带蓝倾向） —— */
+  --lx-bg-0:#05060A;          /* 场景底 / 页面底 */
+  --lx-bg-1:#0A0C12;          /* 面板 */
+  --lx-bg-2:#0E1119;          /* 悬浮卡 / 嵌套块 */
+  --lx-bg-3:#080A10;          /* 输入内底 */
+  --lx-hover:rgba(255,255,255,.025);
+  /* —— 文字 —— */
+  --lx-text-1:#EDEFF7;        /* 主文字 / 标题 */
+  --lx-text-2:#9BA3B8;        /* 次文字 / 标签 */
+  --lx-text-3:#5E667C;        /* 辅助 / 占位 */
+  --lx-text-4:#3B4256;        /* 仅装饰（对比不达标，禁用于信息文字） */
+  /* —— 边线 —— */
+  --lx-line-1:rgba(255,255,255,.06);
+  --lx-line-2:rgba(255,255,255,.10);
+  --lx-line-3:rgba(255,255,255,.18);
+  /* —— 语义（唯一交互色 + 状态） —— */
+  --lx-accent:#8B96F8;
+  --lx-accent-deep:#5A63E8;
+  --lx-accent-dim:rgba(122,134,248,.10);
+  --lx-danger:#E5696F;
+  --lx-warn:#D9A13E;
+  --lx-ok:#4CC38A;
+  /* —— 物候（状态唯一色源，与 3D 材质基色同源） —— */
+  --lx-ph-stump:#6B5A45;      /* 断木桩 · 未分解 */
+  --lx-ph-branch:#7A6A50;     /* 断枝 · 顶层分解 */
+  --lx-ph-sprout:#8CAF6E;     /* 新枝 · 月度分解 */
+  --lx-ph-bud:#74A95C;        /* 芽 · 周度分解完成 */
+  --lx-ph-blossom:#E8A4C4;    /* 花 · 已落日（未来周） */
+  --lx-ph-green:#4E8F3E;      /* 青柿 · 本周 */
+  --lx-ph-yellow:#D9C46A;     /* 黄柿 · 今天 */
+  --lx-ph-ripe:#D97618;       /* 熟柿 · 完成 */
+  --lx-ph-rotten:#8A5A2B;     /* 坏柿 · 超时 */
+  --lx-ph-soul:#9BA8C4;       /* 灵魂 · 超时原位残影 */
+  /* —— 域（岛屿/规划域，新域从此扩展） —— */
+  --lx-dom-1:#5B9BE6;         /* 科研 */
+  --lx-dom-2:#D99A3A;         /* 商业 */
+  --lx-temp:#38BDF8;          /* 临时任务（全局日程池） */
+  /* —— 缓动（组件过渡通用） —— */
+  --lx-ease:cubic-bezier(.4,0,.2,1);
+  /* —— 画板（飞书画板语言：平涂、细边、轻浮层） —— */
+  --bd-canvas:#0F1218;        /* 分解画布底 */
+  --bd-surface:#151922;       /* 节点 / 卡片 */
+  --bd-surface-2:#1A1F2A;     /* 浮层 / 嵌套块 */
+  --bd-surface-3:#11151C;     /* 画布内凹槽 / 输入底 */
+  --bd-line:rgba(255,255,255,.10);
+  --bd-line-strong:rgba(255,255,255,.18);
+  --bd-text:#E9ECF4;
+  --bd-text-2:#A7AEC0;
+  --bd-text-3:#6E7689;
+  --bd-accent:#8B96F8;
+  --bd-blue-fill:rgba(91,155,230,.14);
+  --bd-lav-fill:rgba(139,150,248,.14);
+  --bd-cream-fill:rgba(217,161,62,.12);
+  --bd-green-fill:rgba(76,195,138,.12);
+  --bd-rose-fill:rgba(229,105,111,.12);
+  --bd-r-node:10px;
+  --bd-r-zone:12px;
+  --bd-shadow-float:0 12px 32px rgba(0,0,0,.45);
+  /* —— 圆角 / 层级 —— */
+  --lx-r-sm:6px; --lx-r-md:8px; --lx-r-lg:12px;
+  --lx-shadow-pop:0 12px 40px rgba(0,0,0,.55);
+  --lx-hi:inset 0 1px 0 rgba(255,255,255,.03);       /* 卡片内高光 */
+  --lx-hi-strong:inset 0 1px 0 rgba(255,255,255,.26); /* 按键顶高光 */
+  --lx-ring-focus:0 0 0 3px rgba(122,134,248,.22);   /* 键盘焦点环 */
+  /* —— 动效 —— */
+  --lx-m-fast:120ms ease-out;
+  --lx-m-base:200ms ease-out;
+  --lx-m-slow:280ms cubic-bezier(.4,0,.2,1);
+  --lx-m-grow:400ms ease-in-out;
+  --lx-m-out:cubic-bezier(.22,1,.36,1);        /* 柔出（入场定向） */
+  --lx-m-spring:cubic-bezier(.34,1.56,.64,1);  /* 过冲回弹（完成/落位） */
+  /* —— 字体 —— */
+  --lx-font:'Inter','MiSans',-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+  --lx-font-mono:'SF Mono',Consolas,'Courier New',monospace;
+}
+/* —— 进度环角度可过渡（不支持的浏览器静默退化为直切） —— */
+@property --p{syntax:'<percentage>';inherits:true;initial-value:0%}
+/* —— 共享关键帧（组件按名引用；reduced-motion 下全局退化直切） —— */
+@keyframes lx-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes lx-splash{0%{transform:scale(1)}35%{transform:scale(1.06,.93)}70%{transform:scale(.985,1.015)}100%{transform:scale(1)}}
+@keyframes lx-ripe{0%{box-shadow:var(--lx-hi),0 0 0 0 rgba(217,118,24,0)}
+  35%{box-shadow:var(--lx-hi),0 0 0 7px rgba(217,118,24,.20)}
+  100%{box-shadow:var(--lx-hi),0 0 0 14px rgba(217,118,24,0)}}
+@keyframes lx-bob{from{transform:translateY(0)}to{transform:translateY(1.5px)}}
+/* 动效无障碍：系统开启"减少动画"时，一切动效退化为直切 */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}
+}

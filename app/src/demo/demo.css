@@ -1,0 +1,68 @@
+/* ================= demo 面板样式（世界 HUD 精致化 v3：配色并入 app tokens） ================= */
+.dpanel{position:fixed;z-index:30;background:rgba(10,12,18,.78);border:1px solid rgba(255,255,255,.10);
+  border-radius:var(--lx-r-lg,12px);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:var(--lx-hi,0 1px 0 rgba(255,255,255,.06) inset),0 12px 40px rgba(0,0,0,.5);color:#EDEFF7;
+  font-family:'Inter','MiSans',-apple-system,'Segoe UI','Microsoft YaHei',sans-serif}
+
+/* —— 树选择框（左）：全领域目标总览（左列主锚 · 世界布局 v4） —— */
+#treeSel{top:94px;left:16px;padding:9px;display:flex;flex-direction:column;gap:4px;
+  min-width:212px;max-height:44vh;overflow:auto;scrollbar-width:thin}
+#treeSel .ts-t{font-size:10px;font-weight:600;color:#8891A6;letter-spacing:.16em;padding:2px 5px 5px}
+#treeSel .ts-g{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:600;
+  color:#7D8598;letter-spacing:.06em;padding:8px 5px 4px}
+#treeSel .ts-g + .ts-g{border-top:1px solid rgba(255,255,255,.05);margin-top:5px;padding-top:11px}
+#treeSel .ts-g:first-of-type{padding-top:3px}
+#treeSel .ts-g i{width:7px;height:7px;border-radius:50%;flex:none;
+  box-shadow:0 0 6px -1px rgba(255,255,255,.25)}
+#treeSel .ts-g .ts-n{margin-left:auto;font-weight:500;color:#5A6275;font-variant-numeric:tabular-nums}
+#treeSel .ts-row{appearance:none;position:relative;border:1px solid transparent;background:transparent;
+  color:#9BA3B8;font:600 12px/1.35 inherit;font-family:inherit;padding:8px 10px 9px 12px;
+  border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:6px;
+  transition:background .16s ease-out,color .16s ease-out,border-color .16s ease-out,
+    transform .16s var(--lx-m-out,cubic-bezier(.22,1,.36,1));
+  text-align:left;width:100%}
+#treeSel .ts-row:hover{color:#EDEFF7;background:rgba(255,255,255,.05);transform:translateX(1px)}
+#treeSel .ts-row.on{background:rgba(122,134,248,.13);border-color:rgba(122,134,248,.38);color:#EDEFF7}
+#treeSel .ts-row.on::before{content:'';position:absolute;left:0;top:22%;bottom:22%;width:2px;
+  border-radius:2px;background:linear-gradient(180deg,#9BA6FF,#5A63E8);
+  box-shadow:0 0 8px rgba(139,150,248,.6)}
+#treeSel .ts-row .ts-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+#treeSel .ts-row .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#treeSel .ts-row .pc{color:#6C7488;font-weight:500;font-variant-numeric:tabular-nums;flex:none}
+#treeSel .ts-row.on .pc{color:#9BA3E8}
+#treeSel .ts-row .ts-bar{height:2px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden}
+#treeSel .ts-row .ts-bar i{display:block;height:100%;border-radius:2px;
+  background:linear-gradient(90deg,rgba(122,134,248,.9),rgba(122,134,248,.45));
+  transition:width .5s var(--lx-m-out,cubic-bezier(.22,1,.36,1))}
+#treeSel .ts-empty{font-size:11px;color:#6C7488;padding:6px 6px;line-height:1.7}
+
+/* —— 任务树大纲（右上 · 世界布局 v4：默认收纳，≡ 展开内层 obPanel） ——
+   outlineD=纯定位包装（无底无内边距，收起时零占位）；obPanel=玻璃面板本体 */
+#outlineD{position:fixed;top:58px;right:16px;z-index:30;width:274px}
+#obPanel{display:none;max-height:56vh;overflow:auto;scrollbar-width:thin;padding:11px 13px;
+  animation:lx-slide-in .3s var(--lx-m-out,cubic-bezier(.22,1,.36,1))}
+#obTitle{font-size:13px;font-weight:600;padding-bottom:8px;margin-bottom:6px;
+  border-bottom:1px solid rgba(255,255,255,.08);letter-spacing:-.005em}
+#obTitle .pct{color:#8fe3a8;font-weight:700;margin-left:6px}
+#obBody .row{font-size:11px;color:#9BA3B8;line-height:2;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;border-radius:6px;padding:0 6px;margin:0 -6px;
+  transition:background .14s ease-out,color .14s ease-out}
+#obBody .row:hover{background:rgba(255,255,255,.05);color:#C8CEDE}
+#obBody .dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+  margin-right:6px;vertical-align:1px}
+
+/* —— 顶栏 HUD（demo 徽章式读数 · 精修：分组间距/圆点分隔/数字层级） —— */
+#stats.dhud{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+#stats .dbadge{font-size:10px;font-weight:600;padding:2px 9px;border-radius:20px;border:1px solid;
+  letter-spacing:.04em}
+#stats .dpct{font-size:17px;font-weight:700;color:#E8C24A;letter-spacing:0;line-height:1;
+  font-variant-numeric:tabular-nums}
+#stats .dname{font-size:11.5px;color:#C8CEDE;font-weight:600;max-width:200px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#stats .dsep{width:3px;height:3px;border-radius:50%;background:#3B4256;flex:none;margin:0 1px}
+#stats .dstat{display:inline-flex;align-items:baseline;gap:5px;font-size:10.5px}
+#stats .dstat + .dstat{margin-left:2px}
+#stats .dstat i{font-style:normal;color:#6C7488;letter-spacing:.03em}
+#stats .dstat b{font-weight:600;color:#C8CEDE;font-variant-numeric:tabular-nums;font-size:11px}
+#stats .dsub{font-size:11px;color:#9BA3B8}
+#stats .dsub b{color:#EDEFF7}

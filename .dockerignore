@@ -1,0 +1,17 @@
+**/node_modules
+**/.git
+**/.gitignore
+app/data
+data
+deploy/data
+deploy/lxp-data-backup-*.tar.gz
+deploy;C
+papers
+app/start.bat
+app/start.local.bat
+_d*.json
+_h*.txt
+*.log
+*.bundle
+.env
+.env.*

@@ -1,0 +1,250 @@
+/* ============================================================
+   chrome.css — 应用外壳全局样式（消费 tokens.css 的 --lx-* 变量）
+   覆盖：顶栏 / 面板 / 按钮 / 悬停卡 / 日历面板 / 导航 / 3D HUD
+   禁止出现裸色值——一切来自 token。
+   ============================================================ */
+
+/* ===== 基础 ===== */
+html,body{margin:0;height:100%;overflow:hidden;background:var(--lx-bg-0);
+  font-family:var(--lx-font);color:var(--lx-text-1);user-select:none;
+  -webkit-font-smoothing:antialiased}
+canvas.webgl{display:block}
+
+/* ===== 左上品牌胶囊（世界布局 v4：横带拆浮岛） ===== */
+#brandCap{top:12px;left:16px;display:flex;align-items:center;gap:12px;padding:7px 14px;
+  max-width:min(46vw,540px)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;
+  letter-spacing:.01em;white-space:nowrap;color:var(--lx-text-1)}
+.brand .b-dot{width:8px;height:8px;border-radius:50%;flex:none;
+  background:linear-gradient(135deg,#9BA6FF,#5A63E8);
+  box-shadow:0 0 10px rgba(139,150,248,.65),inset 0 1px 0 rgba(255,255,255,.35)}
+.brand .ver{color:var(--lx-text-4);font-weight:400;font-size:11px;margin-left:6px}
+#stats{font-size:11px;color:var(--lx-text-3);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;min-width:0;font-variant-numeric:tabular-nums}
+#stats b{color:var(--lx-text-1);font-weight:600}
+#stats .dpct{font-size:15px}
+
+/* ===== 面板（3D HUD 统一底） ===== */
+.panel{position:fixed;background:rgba(10,12,18,.78);border:1px solid var(--lx-line-1);
+  border-radius:var(--lx-r-lg);backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);padding:10px 14px;z-index:10;
+  box-shadow:var(--lx-hi),0 8px 32px rgba(0,0,0,.35)}
+
+/* ===== 按钮（分层构造） ===== */
+button{height:28px;padding:0 12px;border-radius:var(--lx-r-md);font-size:11.5px;
+  font-family:inherit;cursor:pointer;letter-spacing:.015em;font-weight:500;
+  user-select:none;
+  transition:transform .14s var(--lx-ease),box-shadow .18s,background .18s,border-color .18s;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012));
+  border:1px solid var(--lx-line-2);color:var(--lx-text-2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045)}
+button:hover{color:var(--lx-text-1);border-color:var(--lx-line-3);
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02))}
+button:active{transform:translateY(0);
+  background:rgba(255,255,255,.015);box-shadow:inset 0 2px 4px rgba(0,0,0,.32)}
+button:focus-visible{outline:none;
+  box-shadow:var(--lx-ring-focus),inset 0 1px 0 rgba(255,255,255,.1)}
+/* 导航激活态 */
+button.on{background:var(--lx-accent-dim);color:var(--lx-accent);border-color:rgba(139,150,248,.35)}
+
+/* ===== 底部导航（隐藏式：白把手 + 悬停浮现 · 布局 v5） ===== */
+#dockZone{position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:min(620px,88vw);height:32px;z-index:32;cursor:pointer}
+#dockZone::after{content:'';position:absolute;left:50%;top:9px;transform:translateX(-50%);
+  width:76px;height:3px;border-radius:2px;background:rgba(255,255,255,.38);
+  box-shadow:0 0 10px rgba(255,255,255,.28);
+  transition:background .22s,width .22s var(--lx-m-out)}
+#dockZone:hover::after{background:rgba(255,255,255,.62);width:96px}
+#dock{bottom:8px;left:50%;transform:translateX(-50%) translateY(calc(100% + 16px));
+  opacity:0;pointer-events:none;display:flex;align-items:center;
+  gap:6px;padding:6px 9px;z-index:33;
+  transition:transform .28s var(--lx-m-out),opacity .2s ease}
+#dockZone:hover + #dock,#dock:hover,#dock.show{
+  transform:translateX(-50%);opacity:1;pointer-events:auto}
+#dock .dk-sep{width:1px;height:18px;background:var(--lx-line-1);margin:0 3px;flex:none}
+#dock button{height:26px;padding:0 10px;font-size:11px}
+#dock #btnHome,#dock #hintBtn{min-width:28px;width:28px;padding:0;font-weight:700}
+#dock #hintBtn.on{background:var(--lx-accent-dim);color:var(--lx-accent);
+  border-color:rgba(139,150,248,.35)}
+#dock #navSeg{margin:0}
+
+/* ===== 分段导航胶囊 ===== */
+#navSeg{display:inline-flex;gap:2px;padding:3px;border-radius:var(--lx-r-lg);
+  background:rgba(255,255,255,.035);border:1px solid var(--lx-line-1);vertical-align:middle}
+#navSeg button{border:1px solid transparent;background:transparent;box-shadow:none;
+  height:24px;padding:0 13px;border-radius:calc(var(--lx-r-lg) - 4px);font-size:11px;
+  color:var(--lx-text-3);font-weight:500}
+#navSeg button:hover{color:var(--lx-text-1);background:rgba(255,255,255,.05);border-color:transparent;transform:none}
+#navSeg button.on{background:var(--lx-accent-dim);color:var(--lx-accent);
+  border-color:rgba(139,150,248,.3);box-shadow:none}
+
+/* ===== 右上收纳：大纲开关（世界布局 v4） ===== */
+#obToggle{position:fixed;top:14px;right:16px;z-index:31;width:34px;height:34px;padding:0;
+  border-radius:var(--lx-r-md);background:rgba(10,12,18,.78);border:1px solid var(--lx-line-2);
+  color:var(--lx-text-3);font-size:16px;line-height:1;cursor:pointer;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;transition:all .16s}
+#obToggle:hover{color:var(--lx-text-1);border-color:var(--lx-line-3)}
+#obToggle.on{background:var(--lx-accent-dim);color:var(--lx-accent);
+  border-color:rgba(139,150,248,.35)}
+
+/* ===== 帮助簇（操作提示 + 图例，默认收纳 · W13c） ===== */
+#helpPop{display:none;bottom:62px;left:50%;transform:translateX(-50%);z-index:12;
+  max-width:min(74vw,660px);padding:12px 16px;font-size:11px;color:var(--lx-text-3)}
+#helpPop #hintText{line-height:1.8}
+#helpPop .hp-legend{margin-top:9px;padding-top:9px;border-top:1px solid var(--lx-line-1);
+  line-height:1.9;font-size:10.5px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:0}
+
+/* ===== 面包屑（左列 · brandCap 下方） ===== */
+#crumb{top:54px;left:16px;font-size:11.5px;padding:6px 13px;color:var(--lx-text-3)}
+#crumb span{cursor:pointer;color:var(--lx-accent)}
+#crumb span:hover{text-decoration:underline}
+#crumb em{font-style:normal;color:var(--lx-text-4);margin:0 6px;font-size:9px}
+
+/* ===== 小地图（右下角功能性锚点 · 世界布局 v4 微退后） ===== */
+#minimap{position:fixed;right:12px;bottom:12px;z-index:10;border-radius:var(--lx-r-lg);
+  background:rgba(10,12,18,.78);border:1px solid var(--lx-line-1);
+  backdrop-filter:blur(14px);opacity:.92;transition:opacity .25s ease}
+#minimap:hover{opacity:1}
+
+/* ===== 悬停详情卡 ===== */
+#hoverCard{position:fixed;display:none;z-index:20;min-width:238px;max-width:300px;
+  background:rgba(14,17,25,.82);border:1px solid var(--lx-line-2);border-radius:var(--lx-r-lg);
+  backdrop-filter:blur(14px);padding:13px 15px;font-size:12px;pointer-events:none;
+  box-shadow:var(--lx-hi),0 12px 40px rgba(0,0,0,.5)}
+.hc-title{font-weight:600;font-size:12.5px;color:var(--lx-text-1);margin-bottom:4px;
+  letter-spacing:-.005em;display:flex;align-items:center;gap:8px}
+.hc-title i{width:7px;height:7px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor}
+.hc-path{color:var(--lx-text-4);font-size:9.5px;margin-bottom:8px;letter-spacing:.02em}
+.hc-row{display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:5px}
+.hc-row span{color:var(--lx-text-4)}
+.hc-row b{color:var(--lx-text-2);font-weight:500;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;background:var(--lx-accent-dim);border:1px solid rgba(139,150,248,.3);
+  border-radius:20px;padding:2px 9px;font-size:10.5px;margin:0 5px 4px 0;color:var(--lx-accent)}
+.chip.red{background:rgba(229,105,111,.1);border-color:rgba(229,105,111,.3);color:var(--lx-danger)}
+
+/* ===== 日历面板 ===== */
+#calPanel{right:12px;top:64px;width:262px;z-index:14;padding:10px 12px}
+.calRow{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px}
+.calBtn{background:none;color:var(--lx-text-3);border:1px solid var(--lx-line-1);
+  border-radius:var(--lx-r-sm);min-width:30px;padding:4px 0;font-size:11.5px;cursor:pointer;font-family:inherit;
+  transition:all .15s}
+.calBtn:hover{border-color:var(--lx-line-3);color:var(--lx-text-1)}
+.calBtn.on{background:var(--lx-accent-dim);color:var(--lx-accent);border-color:rgba(139,150,248,.35)}
+.calBtn.td{outline:2px solid var(--lx-ph-yellow);outline-offset:-2px}
+.calSec{font-size:10px;color:var(--lx-text-4);margin:8px 0 5px;letter-spacing:.08em;
+  border-top:1px solid var(--lx-line-1);padding-top:7px}
+.todayBar{font-size:11px;color:var(--lx-ph-yellow);background:rgba(217,196,106,.08);
+  border:1px solid rgba(217,196,106,.3);border-radius:var(--lx-r-sm);padding:4px 8px;margin-bottom:7px}
+.calScroll{max-height:238px;overflow-y:auto;scrollbar-width:thin;
+  scrollbar-color:var(--lx-line-2) transparent}
+.calScroll::-webkit-scrollbar{width:4px}
+.calScroll::-webkit-scrollbar-thumb{background:var(--lx-line-2);border-radius:2px}
+.mon{border:1px solid var(--lx-line-1);border-radius:var(--lx-r-md);margin-bottom:7px;
+  overflow:hidden;cursor:pointer;transition:border-color .15s}
+.mon:hover{border-color:var(--lx-line-3)}
+.monT{font-size:12px;font-weight:600;color:var(--lx-text-1);padding:5px 10px;
+  background:rgba(255,255,255,.02);border-bottom:1px solid var(--lx-line-1)}
+.mon.on{border-color:rgba(139,150,248,.4);box-shadow:0 0 0 1px rgba(139,150,248,.2) inset}
+.mon.on>.monT{background:var(--lx-accent-dim);color:var(--lx-accent)}
+.mon.td{border-color:rgba(217,196,106,.5)}
+.wk{margin:5px;border:1px solid var(--lx-line-1);border-radius:var(--lx-r-sm);cursor:pointer;
+  background:rgba(255,255,255,.015);transition:border-color .15s}
+.wk:hover{border-color:var(--lx-line-3)}
+.wkT{font-size:10.5px;color:var(--lx-text-2);padding:3px 8px;display:flex;justify-content:space-between}
+.wkT span{color:var(--lx-text-4);font-size:9.5px;font-variant-numeric:tabular-nums}
+.wk.on{border-color:rgba(139,150,248,.35);background:var(--lx-accent-dim)}
+.wk.on .wkT{color:var(--lx-accent)}
+.wk.td{border-color:var(--lx-ph-yellow)}
+.dys{display:flex;gap:3px;padding:0 4px 4px}
+.dy{flex:1;text-align:center;padding:3px 0 2px;border-radius:4px;cursor:pointer;
+  border:1px solid var(--lx-line-1);line-height:1.25;transition:all .15s}
+.dy i{font-style:normal;display:block;font-size:9px;color:var(--lx-text-4)}
+.dy b{font-size:11.5px;color:var(--lx-text-2);font-weight:600;font-variant-numeric:tabular-nums}
+.dy:hover{background:var(--lx-hover);border-color:var(--lx-line-3)}
+.dy.on{background:var(--lx-accent-dim);border-color:rgba(139,150,248,.35)}
+.dy.on b,.dy.on i{color:var(--lx-accent)}
+.dy.td{border-color:var(--lx-ph-yellow);background:rgba(217,196,106,.06)}
+.dy.td b{color:var(--lx-ph-yellow)}
+.viewBtn{background:none;color:var(--lx-text-3);border:1px solid var(--lx-line-1);
+  border-radius:var(--lx-r-sm);padding:4px 0;font-size:11px;cursor:pointer;font-family:inherit;
+  transition:all .15s}
+.viewBtn:hover{color:var(--lx-text-1);border-color:var(--lx-line-3)}
+
+/* ===== 确认弹窗 ===== */
+#forceDlg{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:40;
+  background:var(--lx-bg-2);border:1px solid var(--lx-line-2);border-radius:var(--lx-r-lg);
+  padding:16px 20px;box-shadow:var(--lx-shadow-pop),var(--lx-hi)}
+.fd-t{color:var(--lx-text-1);font-size:13px;margin-bottom:14px;font-weight:600}
+.fd-r{display:flex;gap:8px;justify-content:flex-end}
+.fd-r button{border-radius:var(--lx-r-md);padding:5px 14px;font-size:11.5px;cursor:pointer;
+  font-family:inherit;border:1px solid}
+#fdOk{background:linear-gradient(180deg,rgba(229,105,111,.15),rgba(229,105,111,.05));
+  color:var(--lx-danger);border-color:rgba(229,105,111,.3)}
+#fdOk:hover{border-color:rgba(229,105,111,.5)}
+#fdNo{background:none;color:var(--lx-text-3);border-color:var(--lx-line-2)}
+
+/* ===== 通用命名弹层（planner/today 共用 tmpPrompt · 迁自 planner 注入样式） ===== */
+.pt-np-ov{position:fixed;inset:0;z-index:90;background:rgba(5,8,14,.5);display:flex;
+  align-items:center;justify-content:center}
+.pt-np{min-width:260px;background:var(--lx-bg-2,#0E1119);border:1px solid var(--lx-line-2);
+  border-radius:12px;padding:14px 16px;box-shadow:0 18px 46px rgba(0,0,0,.6)}
+.pt-np .t{font-size:12px;color:var(--lx-text-2);margin-bottom:10px;font-weight:600}
+.pt-np input{width:100%;background:var(--lx-bg-3);border:1px solid var(--lx-line-1);border-radius:7px;
+  color:var(--lx-text-1);padding:7px 10px;font-size:12px;font-family:inherit;outline:none}
+.pt-np input:focus{border-color:rgba(139,150,248,.55)}
+.pt-np .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+.pt-np button{padding:5px 14px;border-radius:7px;font-size:11.5px;cursor:pointer;border:1px solid;font-family:inherit}
+.pt-np .ok{background:var(--lx-accent-deep);color:#fff;border-color:transparent;
+  box-shadow:var(--lx-hi-strong)}
+.pt-np .ok:hover{filter:brightness(1.1)}
+.pt-np .no{background:none;color:var(--lx-text-3);border-color:var(--lx-line-2)}
+
+/* ===== 转场暗幕 ===== */
+#fader{position:fixed;inset:0;background:var(--lx-bg-0);opacity:0;pointer-events:none;
+  transition:opacity .26s ease;z-index:30}
+
+/* ===== HUD 入场编排（一次性：错峰浮现，世界布局 v4） ===== */
+@keyframes lx-hud-in{from{opacity:0;transform:translateY(10px)}}
+@keyframes lx-hud-fade{from{opacity:0}}
+@keyframes lx-slide-in{from{opacity:0;transform:translateX(14px)}}
+#brandCap{animation:lx-hud-in .5s var(--lx-m-out) backwards}
+#crumb{animation:lx-hud-in .5s var(--lx-m-out) .06s backwards}
+#treeSel{animation:lx-hud-in .5s var(--lx-m-out) .12s backwards}
+#obToggle{animation:lx-hud-fade .5s ease .18s backwards}
+#dockZone{animation:lx-hud-fade .6s ease .26s backwards}
+#minimap{animation:lx-hud-fade .55s ease .3s backwards}
+#outlineD{animation:lx-slide-in .3s var(--lx-m-out)}
+#helpPop{animation:lx-hud-in .3s var(--lx-m-out)}
+/* 注：obPanel（大纲内层）与 helpPop 的收纳翻转见 demo.css/ui.js——非注册元素的
+   内容级收纳，视图级可见性仍由 applyChrome 统一管（机制 E） */
+
+/* ===== 视图页（宏观/周/今日） ===== */
+.page{position:fixed;left:0;right:0;top:54px;bottom:0;display:none;z-index:9;
+  background:var(--lx-bg-0);overflow:hidden;font-family:var(--lx-font);
+  color:var(--lx-text-2);font-size:12px;-webkit-font-smoothing:antialiased}
+/* 氛围光：页面顶部一抹极淡靛蓝晕染 + 右下弱补光（Linear 式深度幻觉）。
+   区面板背景均为半透明，光会透过面板形成自然明暗渐变 */
+#viewPlan,#viewWeek{
+  background-color:var(--lx-bg-0);
+  background-image:
+    radial-gradient(1100px 460px at 50% -120px,rgba(122,134,248,.10),transparent 62%),
+    radial-gradient(820px 420px at 88% 118%,rgba(122,134,248,.04),transparent 65%),
+    linear-gradient(180deg,rgba(255,255,255,.022),transparent 16%)}
+#viewToday{background:transparent;pointer-events:none}
+#viewToday .tp{pointer-events:auto}
+
+/* ===== 入场编排（§动效：切换进视图时带 data-rise 的元素错峰浮现。
+   只在 showView 加 .entering 门控——数据刷新的重渲染不重播） ===== */
+.page.entering [data-rise]{
+  animation:lx-rise .38s var(--lx-m-out) both;
+  animation-delay:calc(var(--rise-base,0ms) + var(--i,0)*30ms)}
+
+/* ===== 按压反馈（可点胶囊/泡泡的触觉下沉） ===== */
+.wk-wb:active,.mv-bubble:active,#tpDays .bubble:active,.bubble.jumpable:active{transform:scale(.96)}
+
+/* ===== 滚动条全局 ===== */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--lx-line-2);border-radius:3px}
+::-webkit-scrollbar-track{background:transparent}

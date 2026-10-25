@@ -1,0 +1,38 @@
+# ── 依赖 ──
+node_modules/
+**/node_modules/
+
+# ── 运行时数据（绝不提交） ──
+data/
+app/data/
+deploy/data/
+*.tmp
+*.log
+
+# ── 备份 / 归档 ──
+deploy/lxp-data-backup-*.tar.gz
+*.bundle
+
+# ── 本地密钥 ──
+.env
+.env.*
+!.env.example
+app/start.bat
+app/start.local.bat
+
+# ── 临时文件 / 本地资料 ──
+_d*.json
+_h*.txt
+deploy;C/
+papers/
+.zcode/
+
+# ── 构建产物 ──
+ez-tree/build/
+dist/
+
+# ── 操作系统 / 编辑器 ──
+.DS_Store
+Thumbs.db
+/.vscode/
+/.idea/

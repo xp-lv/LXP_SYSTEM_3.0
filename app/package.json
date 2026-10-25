@@ -1,0 +1,16 @@
+{
+  "name": "lxp-system",
+  "version": "1.0.0",
+  "description": "任务树管理系统（单用户·多设备）",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

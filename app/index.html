@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>任务树 · redesign</title>
+<script type="importmap">
+{ "imports": { "three": "./src/three-esm.js" } }
+</script>
+<link rel="stylesheet" href="src/tokens.css">
+<link rel="stylesheet" href="src/chrome.css">
+<link rel="stylesheet" href="src/demo/demo.css">
+</head>
+<body>
+<!-- 世界布局 v4：拆横带 · 两极浮岛 · 非对称平衡（左列主锚 + 底部控制簇 + 右上收纳） -->
+<div id="brandCap" class="panel">
+  <div class="brand"><span class="b-dot"></span>任务树系统</div>
+  <div id="stats"></div>
+</div>
+<div id="crumb" class="panel"></div>
+<div id="treeSel" class="dpanel"></div>
+<button id="obToggle" title="任务树大纲">≡</button>
+<div id="outlineD"><div id="obPanel" class="dpanel"><div id="obTitle"></div><div id="obBody"></div></div></div>
+<!-- 底部导航（隐藏式：白色把手 + 悬停浮现 · 布局 v5） -->
+<div id="dockZone" title="导航"></div>
+<div id="dock" class="panel">
+  <button id="btnHome" title="视角回正">&#8962;</button>
+  <button id="btnUndo" title="撤销（Ctrl+Z）">&#8630;</button>
+  <button id="btnRedo" title="重做（Shift+Ctrl+Z）">&#8631;</button>
+  <button id="btnBackup" title="导出完整备份 JSON（W12）">&#9661; 备份</button>
+  <button id="btnImport" title="从备份 JSON 导入（校验失败整体拒绝）">&#9651; 导入</button>
+  <span class="dk-sep"></span>
+  <span id="navSeg"><button data-nav="world" class="on">世界</button><button data-nav="plan">宏观规划</button><button data-nav="week">周规划</button><button data-nav="today">今日</button></span>
+  <span class="dk-sep"></span>
+  <button id="hintBtn" title="帮助 · 图例">?</button>
+</div>
+<input type="file" id="bkFile" accept="application/json" style="display:none">
+<!-- 帮助簇（世界页默认收纳）：操作提示 + 图例 -->
+<div id="helpPop" class="panel">
+  <div id="hintText">拖拽旋转 · 右键/Shift拖拽平移 · 滚轮缩放 · 单击树=激活 · 双击=聚焦 · 右键树=星球下钻（悬停看任务档案） · Ctrl+Z 撤销 / Shift+Ctrl+Z 重做 · 天光自动跟随真实时间 · Esc 逐层退出 · 世界只读，编辑在规划页</div>
+  <div class="hp-legend">
+    <div><span class="dot" style="background:#FF4433"></span>红光 = 断梢 · 未排期到周/日（含仅月度分配）</div>
+    <div><span class="dot" style="background:#F6B9D2"></span>开放粉花 = 已排期到周/日 · 待执行</div>
+    <div><span class="dot" style="background:#F0C24A"></span>金叶团 = 已完成（叶=小金团 / 分叉全完=大金团）</div>
+    <div><span class="dot" style="background:#8a7a5a"></span>秃干 = 未分解的目标（红光在顶）</div>
+  </div>
+</div>
+<canvas id="minimap" width="170" height="170"></canvas>
+<div id="hoverCard"></div>
+<div id="fader"></div>
+<div id="viewPlan" class="page"></div>
+<div id="viewWeek" class="page"></div>
+<div id="viewToday" class="page"></div>
+
+<script>
+window.__errs=[];(function(){const oe=console.error,ow=console.warn;
+  console.error=function(){window.__errs.push('E:'+[].join.call(arguments,' ').slice(0,300));oe.apply(console,arguments)};
+  console.warn=function(){window.__errs.push('W:'+[].join.call(arguments,' ').slice(0,300));ow.apply(console,arguments)};
+  window.addEventListener('error',function(e){window.__errs.push('ERR: '+e.message)})})();
+</script>
+<script>
+/* three.js 以 UMD 方式预加载（本地 vendor 优先，CDN 兜底），成功后再启动 ES 模块入口。
+   经典 script 立即执行、module 延迟执行，因此 window.THREE 在模块运行前必定就绪。 */
+const CDNS=['vendor/three.min.js',
+ 'https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js',
+ 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'];
+(function load(i){
+  if(i>=CDNS.length){document.body.insertAdjacentHTML('beforeend','<div style="padding:60px;color:#f88">three.js 加载失败</div>');return;}
+  const s=document.createElement('script');s.src=CDNS[i];
+  s.onload=function(){
+    const m=document.createElement('script');m.type='module';m.src='src/main.js';
+    document.head.appendChild(m);};
+  s.onerror=function(){load(i+1)};
+  document.head.appendChild(s);
+})(0);
+/* 启动看门狗：5 秒内模块未完成装配（__BOOT_OK），把捕获到的错误显示到页面 */
+setTimeout(function(){
+  if(!window.__BOOT_OK){
+    document.body.insertAdjacentHTML('beforeend',
+      '<pre style="color:#f88;padding:30px;white-space:pre-wrap">模块装配失败：\n'+
+      (window.__errs.join('\n')||'（无错误信息；请确认通过 http:// 访问而非 file:// 打开）')+'</pre>');}
+},5000);
+</script>
+</body>
+</html>

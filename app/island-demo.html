@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>岛屿地形 Demo · 三峰一谷</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b1220;
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;color:#e8eef8}
+  #cv{position:fixed;inset:0;display:block}
+  #hud{position:fixed;left:18px;top:16px;padding:14px 16px;border-radius:12px;
+    background:rgba(12,18,30,.62);backdrop-filter:blur(8px);
+    border:1px solid rgba(255,255,255,.08);font-size:12.5px;line-height:1.75;
+    max-width:320px;pointer-events:none}
+  #hud h1{margin:0 0 6px;font-size:14px;letter-spacing:.4px}
+  #hud .k{color:#9fb4d0}
+  #hud .tag{display:inline-block;min-width:34px;text-align:center;margin-right:7px;
+    padding:0 6px;border-radius:5px;background:rgba(120,170,255,.16);
+    color:#a9c8f5;font-size:11px}
+  #stats{position:fixed;right:16px;bottom:14px;font-size:11px;color:#8fa3bd;
+    text-align:right;line-height:1.7;background:rgba(12,18,30,.45);
+    padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.06)}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud">
+  <h1>岛屿地形 Demo · 三峰一谷</h1>
+  <div><span class="tag">拖拽</span>旋转视角</div>
+  <div><span class="tag">滚轮</span>缩放</div>
+  <div><span class="tag">W</span>线框 / 实体</div>
+  <div class="k" style="margin-top:8px">
+    三座山峰围合谷地；溪流自高地鞍部出发，穿过谷地，在岛缘跌落。
+    本页仅地形与水，不加载树/草/装饰。
+  </div>
+</div>
+<div id="stats"></div>
+<script type="importmap">{ "imports": { "three": "./src/three-esm.js" } }</script>
+<script src="vendor/three.min.js"></script>
+<script type="module" src="./src/demo/islandDemo.js?v=3"></script>
+</body>
+</html>

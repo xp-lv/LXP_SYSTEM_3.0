@@ -1,0 +1,30 @@
+# ============================================================
+# lxp-system · Cloudflare Tunnel 公网穿透（覆盖文件）
+#
+# 用法（需先在 Cloudflare Zero Trust 建 Tunnel 拿到 TUNNEL_TOKEN，
+# 并配置 Public Hostname：lxpsystem.fun → http://lxp:8080）：
+#
+#   cd deploy
+#   export TOKEN=<原有访问令牌>
+#   export TUNNEL_TOKEN=<Cloudflare Tunnel 令牌>
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d
+#
+# 不带本文件启动 = 维持纯本地部署，互不影响。
+# 国内拉不动 Docker Hub 时：export TUNNEL_IMAGE=docker.1ms.run/cloudflare/cloudflared:latest
+# ============================================================
+
+services:
+  tunnel:
+    image: ${TUNNEL_IMAGE:-cloudflare/cloudflared:latest}
+    container_name: lxp-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:?请设置 TUNNEL_TOKEN（Cloudflare Zero Trust → Networks → Tunnels → 复制令牌）}
+    depends_on:
+      - lxp
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
