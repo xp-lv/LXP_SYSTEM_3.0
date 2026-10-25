@@ -823,7 +823,7 @@ function removeFallenFruits(){
   });
   scene.remove(_fruitGroup);_fruitGroup=null;
 }
-/* ---------- 落叶堆 3D（05.3：树旁外缘地面，点击回看欠账） ---------- */
+/* ---------- 落叶堆 3D（05.3：石环内左前侧草坪，点击回看欠账） ---------- */
 var _pileLeafGeo=null,_pileMoundGeo=null;
 /* 枫叶轮廓：五裂 + 叶柄；顶点沿叶面轻微弯曲，避免纯平面纸片感 */
 function makeLeafGeometry(){
@@ -855,16 +855,12 @@ function buildLeafPile(list){
   var g=new THREE.Group();
   var s=_stageBody?_stageBody.scale:1;
   var maxR=(STAGE.R0||300)*.90;
-  var tx=STAGE.treeX!=null?STAGE.treeX:STAGE.x;
-  var tz=STAGE.treeZ!=null?STAGE.treeZ:STAGE.z;
-  var dx=tx-STAGE.x,dz=tz-STAGE.z,dl=Math.hypot(dx,dz)||1;
-  var ox=dx/dl,oz=dz/dl;                 /* 岛心→树：向岛外 */
   var size=Math.min(1,.55+list.length*.06);
-  var pileR=Math.min(.75*s*size,Math.max(12,maxR-dl-.22*s));
+  var pileR=Math.min(.75*s*size,maxR*.16);
   var pileH=.46*s*size;
-  var off=Math.min(.30*s,Math.max(0,(maxR-pileR-dl)*.8));
-  /* 向岛心收一点、再向镜头方向前移：避开左缘石头和树基遮挡 */
-  var px=tx+ox*off+.55*s,pz=tz+oz*off+2.0*s;
+  /* 石环内部左前侧草坪：以岛心为基准，不再沿树向围栏外扇出 */
+  var px=STAGE.x-.50*(STAGE.R0||300);
+  var pz=STAGE.z+.12*(STAGE.R0||300);
   var py=stageY(px,pz);
   /* 深色丘体只负责填缝和承托，表层由真实叶片覆盖 */
   _pileMoundGeo=new THREE.SphereGeometry(1,16,10);
