@@ -1,5 +1,5 @@
 import THREE from './three.js';
-import {scene,renderer,camera} from './scene.js';
+import {scene} from './scene.js';
 import {state,data,pickMeshes} from './state.js';
 function require_state(){return{state:state}}
 import {byTitle} from './data.js';

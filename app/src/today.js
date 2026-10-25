@@ -824,7 +824,31 @@ function removeFallenFruits(){
   scene.remove(_fruitGroup);_fruitGroup=null;
 }
 /* ---------- 落叶堆 3D（05.3：树旁外缘地面，点击回看欠账） ---------- */
-var _pileGeo=null,_pileMoundGeo=null;
+var _pileLeafGeo=null,_pileMoundGeo=null;
+/* 枫叶轮廓：五裂 + 叶柄；顶点沿叶面轻微弯曲，避免纯平面纸片感 */
+function makeLeafGeometry(){
+  var sh=new THREE.Shape();
+  var pts=[
+    [0,-1.05],[.04,-1.05],[.04,-.66],[.17,-.56],
+    [.50,-.62],[.41,-.39],[.73,-.31],
+    [.58,-.10],[.96,-.01],[.71,.18],[.58,.48],
+    [.33,.37],[.21,.79],[0,.60],
+    [-.21,.79],[-.33,.37],[-.58,.48],[-.71,.18],[-.96,-.01],
+    [-.58,-.10],[-.73,-.31],[-.41,-.39],[-.50,-.62],[-.17,-.56],
+    [-.04,-.66],[-.04,-1.05]
+  ];
+  sh.moveTo(pts[0][0],pts[0][1]);
+  for(var i=1;i<pts.length;i++)sh.lineTo(pts[i][0],pts[i][1]);
+  sh.closePath();
+  var geo=new THREE.ShapeGeometry(sh);
+  var pos=geo.attributes.position;
+  for(var j=0;j<pos.count;j++){
+    var x=pos.getX(j),y=pos.getY(j);
+    pos.setZ(j,.10*(x*x+.32*y*y)+.035*Math.sin(y*4));
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
 function buildLeafPile(list){
   removeLeafPile();
   if(!list||!list.length)return;
@@ -836,43 +860,100 @@ function buildLeafPile(list){
   var dx=tx-STAGE.x,dz=tz-STAGE.z,dl=Math.hypot(dx,dz)||1;
   var ox=dx/dl,oz=dz/dl;                 /* 岛心→树：向岛外 */
   var size=Math.min(1,.55+list.length*.06);
-  var pileR=Math.min(.55*s*size,Math.max(10,maxR-dl-.22*s));
-  var pileH=.30*s*size;
+  var pileR=Math.min(.75*s*size,Math.max(12,maxR-dl-.22*s));
+  var pileH=.46*s*size;
   var off=Math.min(.30*s,Math.max(0,(maxR-pileR-dl)*.8));
   /* 向岛心收一点、再向镜头方向前移：避开左缘石头和树基遮挡 */
   var px=tx+ox*off+.55*s,pz=tz+oz*off+2.0*s;
   var py=stageY(px,pz);
-  /* 低矮落叶丘：先给堆一个体量，叶盘再铺在丘面与边缘 */
-  _pileMoundGeo=new THREE.SphereGeometry(1,10,6);
+  /* 深色丘体只负责填缝和承托，表层由真实叶片覆盖 */
+  _pileMoundGeo=new THREE.SphereGeometry(1,16,10);
   var mound=new THREE.Mesh(_pileMoundGeo,new THREE.MeshStandardMaterial({
-    color:new THREE.Color(0x4f3818).convertSRGBToLinear(),roughness:.98,
+    color:new THREE.Color(0x3b2514).convertSRGBToLinear(),roughness:1,
     flatShading:true,side:THREE.DoubleSide}));
-  mound.position.set(px,py+pileH*.18,pz);
-  mound.scale.set(pileR,pileH*.55,pileR*.92);
+  mound.position.set(px,py+pileH*.16,pz);
+  mound.scale.set(pileR*.98,pileH*.60,pileR*.90);
   mound.rotation.y=Math.random()*Math.PI*2;
+  mound.castShadow=true;mound.receiveShadow=true;
   mound.userData.pick={kind:'pile'};
   pickMeshes.push(mound);g.add(mound);
-  var cols=[0x6e4c1e,0x7d5a24,0x5f421c,0x8a6528];
-  var n=Math.min(80,Math.max(8,list.length*3));
-  _pileGeo=new THREE.CircleGeometry(5.4,7);    /* 共享几何体（移除时统一释放） */
-  var geo=_pileGeo;
+  /* 秋色叶盘：橙/黄/红/褐/少量青绿，按实例上色 */
+  var cols=[0x8e2b1f,0xb43b1e,0xd35a1f,0xe08a25,0xe6b23a,0xc9a24a,0x8a8a32,0x6f7f2f,0x7a4a24];
+  var n=Math.min(280,Math.max(80,list.length*7+60));
+  _pileLeafGeo=makeLeafGeometry();
+  var leafMat=new THREE.MeshStandardMaterial({
+    color:0xffffff,roughness:.88,metalness:0,side:THREE.DoubleSide,
+    emissive:new THREE.Color(0x1a0d05).convertSRGBToLinear(),emissiveIntensity:.06
+  });
+  var leaves=new THREE.InstancedMesh(_pileLeafGeo,leafMat,n);
+  leaves.frustumCulled=false;                  /* 实例分布远大于单片叶的包围球 */
+  leaves.castShadow=true;leaves.receiveShadow=true;
+  var dummy=new THREE.Object3D();
+  var zAxis=new THREE.Vector3(0,0,1),nrm=new THREE.Vector3();
+  var quat=new THREE.Quaternion(),spin=new THREE.Quaternion(),col=new THREE.Color();
   for(var i=0;i<n;i++){
-    var c=cols[i%cols.length];
-    var m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({
-      color:new THREE.Color(c).convertSRGBToLinear(),roughness:.95,
-      emissive:new THREE.Color(c).convertSRGBToLinear(),emissiveIntensity:.03,side:THREE.DoubleSide}));
-    var a=Math.random()*Math.PI*2;
-    var r=Math.sqrt(Math.random())*pileR*1.02;
-    var p=stageClamp(px+Math.cos(a)*r,pz+Math.sin(a)*r*.92,maxR);
-    m.position.set(p.x,stageY(p.x,p.z)+pileH*(.18+Math.random()*.62),p.z);
-    m.userData.pick={kind:'pile'};
-    m.rotation.x=-Math.PI/2+(Math.random()-.5)*.7;
-    m.rotation.z=Math.random()*Math.PI*2;
-    var sc=.7+Math.random()*.8;
-    m.scale.set(sc,sc*(1.3+Math.random()*.45),sc);
-    pickMeshes.push(m);
-    g.add(m);
+    var a=Math.random()*Math.PI*2,mode=Math.random();
+    var x,z,y,sc,rr,p;
+    if(mode<.82){                               /* 丘面：沿穹顶分层铺叶 */
+      var u=Math.sqrt(Math.random());
+      var dome=Math.pow(1-u*u,.65);
+      rr=pileR*u*.98;
+      p=stageClamp(px+Math.cos(a)*rr,pz+Math.sin(a)*rr*.92,maxR);
+      y=stageY(p.x,p.z)+pileH*(.12+.82*dome)+(Math.random()-.5)*1.6;
+      nrm.set(Math.cos(a)*u*.55,1,Math.sin(a)*u*.55);
+      sc=2.8+Math.random()*3.0;
+    }else if(mode<.96){                         /* 堆脚：散落在草坪上 */
+      rr=pileR*(.95+Math.random()*.85);
+      p=stageClamp(px+Math.cos(a)*rr,pz+Math.sin(a)*rr*.92,maxR);
+      y=stageY(p.x,p.z)+.8+Math.random()*1.8;
+      nrm.set((Math.random()-.5)*.25,1,(Math.random()-.5)*.25);
+      sc=3.0+Math.random()*3.0;
+    }else{                                      /* 少量斜插叶：补足轮廓 */
+      rr=pileR*(.55+Math.random()*.55);
+      p=stageClamp(px+Math.cos(a)*rr,pz+Math.sin(a)*rr*.92,maxR);
+      y=stageY(p.x,p.z)+pileH*(.16+Math.random()*.55);
+      nrm.set(Math.cos(a)*.5,.8,Math.sin(a)*.5);
+      sc=2.4+Math.random()*2.0;
+    }
+    nrm.normalize();
+    quat.setFromUnitVectors(zAxis,nrm);
+    spin.setFromAxisAngle(zAxis,Math.random()*Math.PI*2);
+    quat.multiply(spin);
+    dummy.position.set(p.x,y,p.z);
+    dummy.quaternion.copy(quat);
+    dummy.scale.setScalar(sc);
+    dummy.updateMatrix();
+    leaves.setMatrixAt(i,dummy.matrix);
+    col.set(cols[Math.floor(Math.random()*cols.length)]).convertSRGBToLinear();
+    leaves.setColorAt(i,col);
   }
+  leaves.instanceMatrix.needsUpdate=true;
+  if(leaves.instanceColor)leaves.instanceColor.needsUpdate=true;
+  leaves.userData.pick={kind:'pile'};
+  pickMeshes.push(leaves);g.add(leaves);
+  /* 几片悬在堆上方的落叶：对应参考图里正在飘落的叶子 */
+  var air=new THREE.InstancedMesh(_pileLeafGeo,leafMat,4);
+  air.frustumCulled=false;
+  air.castShadow=false;air.receiveShadow=false;
+  for(var k=0;k<4;k++){
+    var aa=Math.random()*Math.PI*2;
+    var ar=pileR*(.75+Math.random()*.8);
+    nrm.set((Math.random()-.5)*1.2,.25+Math.random()*.75,(Math.random()-.5)*1.2).normalize();
+    quat.setFromUnitVectors(zAxis,nrm);
+    spin.setFromAxisAngle(zAxis,Math.random()*Math.PI*2);
+    quat.multiply(spin);
+    dummy.position.set(px+Math.cos(aa)*ar,py+pileH*(1.15+Math.random()*.75),pz+Math.sin(aa)*ar*.9);
+    dummy.quaternion.copy(quat);
+    dummy.scale.setScalar(2.6+Math.random()*2.0);
+    dummy.updateMatrix();
+    air.setMatrixAt(k,dummy.matrix);
+    col.set(cols[Math.floor(Math.random()*cols.length)]).convertSRGBToLinear();
+    air.setColorAt(k,col);
+  }
+  air.instanceMatrix.needsUpdate=true;
+  if(air.instanceColor)air.instanceColor.needsUpdate=true;
+  air.userData.pick={kind:'pile'};
+  pickMeshes.push(air);g.add(air);
   scene.add(g);_pileGroup=g;
 }
 function removeLeafPile(){
@@ -883,7 +964,7 @@ function removeLeafPile(){
     if(o.material)o.material.dispose();
   });
   scene.remove(_pileGroup);_pileGroup=null;
-  if(_pileGeo){_pileGeo.dispose();_pileGeo=null}
+  if(_pileLeafGeo){_pileLeafGeo.dispose();_pileLeafGeo=null}
   if(_pileMoundGeo){_pileMoundGeo.dispose();_pileMoundGeo=null}
 }
 
