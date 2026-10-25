@@ -958,10 +958,11 @@ function buildLeafPile(list){
 }
 function removeLeafPile(){
   if(!_pileGroup)return;
+  var mats=new Set();
   _pileGroup.traverse(function(o){
     var i=pickMeshes.indexOf(o);
     if(i>=0)pickMeshes.splice(i,1);
-    if(o.material)o.material.dispose();
+    if(o.material&&!mats.has(o.material)){mats.add(o.material);o.material.dispose()}
   });
   scene.remove(_pileGroup);_pileGroup=null;
   if(_pileLeafGeo){_pileLeafGeo.dispose();_pileLeafGeo=null}
