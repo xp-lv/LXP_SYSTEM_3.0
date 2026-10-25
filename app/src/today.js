@@ -782,8 +782,8 @@ function ensureStageRock(){
   STAGE.tipX=mini.center.x;
   STAGE.tipY=mini.center.y+0.04*mini.scale;
   STAGE.tipZ=mini.center.z+2.25*mini.scale;
-  STAGE.treeX=mini.center.x+mini.lawnTree.x*mini.scale;
-  STAGE.treeZ=mini.center.z+mini.lawnTree.z*mini.scale;
+  STAGE.treeX=mini.center.x;             /* 周度树落在心形土壤中心 */
+  STAGE.treeZ=mini.center.z;
 }
 /* 启动即定位到世界岛上的卫星岛（不新增岛体） */
 export function initTodayStage(){ensureStageRock()}
@@ -928,7 +928,10 @@ function buildLeafPile(list){
   leaves.userData.pick={kind:'pile'};
   pickMeshes.push(leaves);g.add(leaves);
   /* 几片悬在堆上方的落叶：对应参考图里正在飘落的叶子 */
-  var air=new THREE.InstancedMesh(_pileLeafGeo,leafMat,4);
+  var airMat=leafMat.clone();
+  airMat.emissive=new THREE.Color(0x3a1c08).convertSRGBToLinear();
+  airMat.emissiveIntensity=.45;
+  var air=new THREE.InstancedMesh(_pileLeafGeo,airMat,4);
   air.frustumCulled=false;
   air.castShadow=false;air.receiveShadow=false;
   for(var k=0;k<4;k++){
@@ -940,10 +943,10 @@ function buildLeafPile(list){
     quat.multiply(spin);
     dummy.position.set(px+Math.cos(aa)*ar,py+pileH*(1.15+Math.random()*.75),pz+Math.sin(aa)*ar*.9);
     dummy.quaternion.copy(quat);
-    dummy.scale.setScalar(2.6+Math.random()*2.0);
+    dummy.scale.setScalar(2.0+Math.random()*1.4);
     dummy.updateMatrix();
     air.setMatrixAt(k,dummy.matrix);
-    col.set(cols[Math.floor(Math.random()*cols.length)]).convertSRGBToLinear();
+    col.set(cols[Math.floor(Math.random()*6)]).convertSRGBToLinear();
     air.setColorAt(k,col);
   }
   air.instanceMatrix.needsUpdate=true;
