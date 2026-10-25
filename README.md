@@ -52,6 +52,23 @@ node tests/run.mjs     # 23 个单元测试
 node tests/check.mjs   # 10 条架构规则
 ```
 
+## 版本管理
+
+- 单一仓库：`ez-tree/` 以 vendored 源码纳入本仓库，不是 submodule；来源与本地改动见
+  [`ez-tree/VENDORED.md`](ez-tree/VENDORED.md)。
+- 不提交运行时数据、备份和本地令牌：`.gitignore` 已忽略 `app/data/`、
+  `deploy/lxp-data-backup-*.tar.gz`、`app/start.bat` 和 `.env`。
+- 首次推送到 GitHub：
+  ```bash
+  git remote add origin git@github.com:<你的账号>/lxp-system.git
+  git push -u origin main
+  ```
+  也可以用 GitHub CLI 创建私有仓库：
+  ```bash
+  gh repo create lxp-system --private --source=. --remote=origin --push
+  ```
+- CI 在 `.github/workflows/ci.yml` 中运行单元测试与架构规则。
+
 ## 技术栈
 
 - **前端**：原生 ES Module + three.js r128（零构建、零框架）
