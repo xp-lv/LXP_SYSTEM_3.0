@@ -8,6 +8,7 @@ export const STAGE={
   y:600,
   z:0,
   t:0.62,          /* 今日机位方位（与相机 module 的球坐标口径一致） */
-  groundY:0        /* 构建后写入：小岛中心的实际世界高度 */
+  groundY:0,       /* 构建后写入：小岛中心的实际世界高度 */
+  ready:false      /* ensureStageRock 完成后置 true（世界视角周树定位用） */
 };
 if(typeof window!=='undefined')window.__STAGE=STAGE;   /* 调试探针（debug.js 同风格） */

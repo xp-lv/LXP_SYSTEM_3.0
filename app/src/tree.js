@@ -6,7 +6,8 @@ import {renderCrumb} from './ui.js';
 import {sph,tgt} from './camera.js';
 import {getTrees,getWorldIsland,treeColorOf} from './world.js';
 import {slotOf,crownScaleOf} from './slots.js';
-import {weekTreeMounted} from './today.js';
+import {weekTreeMounted,makeWeekVTree} from './today.js';
+import {STAGE} from './demo/stage.js';
 import {appCfg,buildGoalTree,initGoalMats,clearBeacons} from './demo/goal.js';
 import {buildEzTreeApp,onBarkReady,clearEzBeacons} from './demo/eztree.js';
 
@@ -65,7 +66,18 @@ function buildAllTrees(){
     if(t===data.root)return;
     buildDemoTreeInto(t,false)});
   if(data.root&&getTrees().indexOf(data.root)>=0)
-    buildDemoTreeInto(data.root,true);}
+    buildDemoTreeInto(data.root,true);
+  /* 世界视角：卫星岛上也常驻一棵本周果树（与今日页同一棵虚拟周树） */
+  if(STAGE.ready){
+    var wv=makeWeekVTree();
+    if(wv&&wv.children&&wv.children.length){
+      wv._gx=STAGE.treeX!=null?STAGE.treeX:STAGE.x;
+      wv._gz=STAGE.treeZ!=null?STAGE.treeZ:STAGE.z;
+      wv._groundY=STAGE.groundY;
+      buildVirtualTree(wv);
+    }
+  }
+}
 function buildVirtualTree(vr){
   if(!vr.children||!vr.children.length)return;   /* 整周无排程：不建树（空根会渲染成断梢红桩） */
   const H=170;

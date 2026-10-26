@@ -746,6 +746,11 @@ function buildWeekVTree(t0,vw){
   derive(vroot);
   return vroot;
 }
+/* 世界视角的卫星岛本周树：与今日页共用同一棵虚拟周树 */
+export function makeWeekVTree(){
+  var t0=today();
+  return buildWeekVTree(t0,weekKeyOf(parse(t0.d)));
+}
 
 /* ===== 今日小岛 = 世界岛右下方那座带石环/心形耕地的卫星岛（同一座，不另建） ===== */
 var _stageGroup=null,_stageBody=null,_stageHeightAt=null;
@@ -784,9 +789,10 @@ function ensureStageRock(){
   STAGE.tipZ=mini.center.z+2.25*mini.scale;
   STAGE.treeX=mini.center.x;             /* 周度树落在心形土壤中心 */
   STAGE.treeZ=mini.center.z;
+  STAGE.ready=true;
 }
 /* 启动即定位到世界岛上的卫星岛（不新增岛体） */
-export function initTodayStage(){ensureStageRock();refreshLeafPile(true)}
+export function initTodayStage(){ensureStageRock();rebuild();refreshLeafPile(true)}
 
 /* ---------- 落果 3D（05.3：心形土壤上的秋果，点击开补点） ---------- */
 function buildFallenFruits(list){
