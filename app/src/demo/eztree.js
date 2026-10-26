@@ -24,7 +24,7 @@ function toTask(n) {
     return { id, name, est: n.hours, ch: n.children.map(toTask) };
   }
   const done = (n.progress || 0) >= 1;
-  const planned = !!(n.assignD || n.assignW);   /* 周/日=执行轨道；assignM 不算（未分解到位） */
+  const planned = !!(n.assignD || n.assignW) && !n.overdue;   /* 周/日=执行轨道；逾期保留断梢+红光 */
   const h = Math.max(1, n.hours || 2);
   if (done || planned) {
     return { id, name, est: h, days: [{ n: name, h, w: n.assignW ? 'week' : 'next', done }] };

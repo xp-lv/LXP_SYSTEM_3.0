@@ -705,22 +705,23 @@ function closeBacklogPanel(){
 
 /* ---------- 今日页挂载/卸载/渲染 ---------- */
 var _inToday=false,_savedRoot=null,_fruitGroup=null,_pileGroup=null;
+var _fruitGeo=null,_fruitStemGeo=null,_fruitLeafGeo=null,_fruitRingGeo=null,_fruitGlowTex=null;
 var _lastListDay=null;   /* 交互优化：同日重渲染保持清单滚动位置 */
 
 export function weekTreeMounted(){return _inToday}
 
 /* 虚拟周树（05.1）：主干 → 一级枝（每目标一枝 + 临时枝）→ 果。
-   口径=该周已落日/已补点任务"不多不少"：含完成（树语言之金叶），
-   本周超时下树为落果（R21），临时枝只含本周。
+   口径=该周已落日/已补点任务"不多不少"：含完成（树语言之金叶）；
+   本周超时**保留在树上**为断梢+红光（R21），同时树下生成可点击落果。
    **空枝不渲染**：本周无叶的目标枝/临时枝不挂——空分组会被树管线当成
    无排期叶渲染成断梢红光（v4），周树只显示落实到本周的任务。 */
 function buildWeekVTree(t0,vw){
   var vroot={id:-1,title:'本周',depth:0,parent:null,children:[],lvl:'virtual',_virtual:true};
   var inWeek=function(d){return d&&weekKeyOf(parse(d))===vw};
-  var isFallen=function(d,prog){return prog<1&&!!d&&d<t0.d};   /* R21：本周超时 → 落果 */
-  function wrap(real){
+  var isFallen=function(d,prog){return prog<1&&!!d&&d<t0.d};   /* R21：本周超时 → 断梢+落果 */
+  function wrap(real,overdue){
     return{id:real.id,title:real.title,depth:2,parent:null,children:[],leaf:true,
-      hours:real.hours||0,progress:real.progress||0,overdue:false,
+      hours:real.hours||0,progress:real.progress||0,overdue:!!overdue,
       lvl:real.lvl||'week',assignD:real.makeup||real.assignD||null,assignW:real.assignW,
       makeup:real.makeup,order:real.order,checklist:real.checklist,_real:real};
   }
@@ -729,8 +730,7 @@ function buildWeekVTree(t0,vw){
     q.allLeaves([root]).forEach(function(l){
       var d=l.makeup||l.assignD||effD(l);
       if(!d||!inWeek(d))return;
-      if(isFallen(d,l.progress))return;
-      var c=wrap(l);c.parent=goal;goal.children.push(c);
+      var c=wrap(l,isFallen(d,l.progress));c.parent=goal;goal.children.push(c);
     });
     if(goal.children.length)vroot.children.push(goal);      /* 空枝不挂 */
   });
@@ -739,8 +739,7 @@ function buildWeekVTree(t0,vw){
   (data.temps||[]).forEach(function(t){
     var d=t.makeup||t.assignD;
     if(!d||!inWeek(d))return;
-    if(isFallen(d,t.progress))return;
-    var c=wrap(t);c.parent=tempBranch;tempBranch.children.push(c);
+    var c=wrap(t,isFallen(d,t.progress));c.parent=tempBranch;tempBranch.children.push(c);
   });
   if(tempBranch.children.length)vroot.children.push(tempBranch);   /* 空枝不挂 */
   vroot.children.forEach(function(g){g.children.forEach(function(c){c.parent=g})});
@@ -789,7 +788,7 @@ function ensureStageRock(){
 /* 启动即定位到世界岛上的卫星岛（不新增岛体） */
 export function initTodayStage(){ensureStageRock();refreshLeafPile(true)}
 
-/* ---------- 落果 3D（05.3：树下散果，点击开补点） ---------- */
+/* ---------- 落果 3D（05.3：心形土壤上的秋果，点击开补点） ---------- */
 function buildFallenFruits(list){
   removeFallenFruits();
   if(!list||!list.length)return;
@@ -799,30 +798,96 @@ function buildFallenFruits(list){
   var maxR=(STAGE.R0||300)*.88;
   var tx=STAGE.treeX!=null?STAGE.treeX:STAGE.x;
   var tz=STAGE.treeZ!=null?STAGE.treeZ:STAGE.z;
-  var cols=[0xD97618,0xC25A2B,0xE8A44C];
+  _fruitGeo=new THREE.SphereGeometry(1,12,9);
+  _fruitStemGeo=new THREE.CylinderGeometry(1,1,1,5);
+  _fruitLeafGeo=makeLeafGeometry();
+  _fruitRingGeo=new THREE.RingGeometry(.9,1.25,20);
+  var palette=[0xd94b2b,0xe08a25,0xc23a2b,0xd9a13e,0xb84a1e];
+  var mats=palette.map(function(c){
+    return new THREE.MeshStandardMaterial({
+      color:new THREE.Color(c).convertSRGBToLinear(),roughness:.62,metalness:0,
+      flatShading:true,emissive:new THREE.Color(0x2a0d05).convertSRGBToLinear(),
+      emissiveIntensity:.12
+    });
+  });
+  var stemMat=new THREE.MeshStandardMaterial({
+    color:new THREE.Color(0x5a3a1c).convertSRGBToLinear(),roughness:.95,flatShading:true
+  });
+  var leafMats=[0x8a8a32,0xc9a24a,0x6f7f2f].map(function(c){
+    return new THREE.MeshStandardMaterial({
+      color:new THREE.Color(c).convertSRGBToLinear(),roughness:.9,
+      side:THREE.DoubleSide,emissive:new THREE.Color(0x1a0d05).convertSRGBToLinear(),
+      emissiveIntensity:.08
+    });
+  });
+  var ringMat=new THREE.MeshBasicMaterial({
+    color:0xff7a3a,transparent:true,opacity:.14,depthWrite:false,side:THREE.DoubleSide
+  });
+  var glowCv=document.createElement('canvas');
+  glowCv.width=glowCv.height=64;
+  var gx=glowCv.getContext('2d');
+  var gr=gx.createRadialGradient(32,32,2,32,32,30);
+  gr.addColorStop(0,'rgba(255,150,70,.9)');
+  gr.addColorStop(.45,'rgba(255,100,45,.38)');
+  gr.addColorStop(1,'rgba(255,80,35,0)');
+  gx.fillStyle=gr;gx.beginPath();gx.arc(32,32,30,0,7);gx.fill();
+  _fruitGlowTex=new THREE.CanvasTexture(glowCv);
+  var glowMat=new THREE.SpriteMaterial({
+    map:_fruitGlowTex,color:0xff8a4a,transparent:true,opacity:.16,
+    blending:THREE.AdditiveBlending,depthWrite:false
+  });
   for(var i=0;i<n;i++){
-    var m=new THREE.Mesh(new THREE.SphereGeometry(2.6,10,8),
-      new THREE.MeshStandardMaterial({color:new THREE.Color(cols[i%3]).convertSRGBToLinear(),roughness:.7,flatShading:true}));
-    var a=Math.random()*Math.PI*2,r=.16*s+Math.random()*.42*s;
-    var p=stageClamp(tx+Math.cos(a)*r,tz+Math.sin(a)*r*.8,maxR);
-    m.position.set(p.x,stageY(p.x,p.z)+1+Math.random()*1.5,p.z);
-    m.userData.pick={kind:'fallen',node:list[i]};   /* 真实任务节点：补点写真数据（R17） */
-    pickMeshes.push(m);
-    g.add(m);
+    var r=6.0+Math.random()*3.0;
+    var fg=new THREE.Group();
+    var a=i*2.399963+Math.random()*.3;
+    var rr=Math.min(.80*s,10+Math.sqrt(i+1)*3.8+Math.random()*4);
+    var p=stageClamp(tx+Math.cos(a)*rr,tz+Math.sin(a)*rr*.85,maxR);
+    fg.position.set(p.x,stageY(p.x,p.z),p.z);
+    var fruit=new THREE.Mesh(_fruitGeo,mats[i%mats.length]);
+    fruit.scale.set(r,r*.92,r);
+    fruit.position.y=r*.88;
+    fruit.castShadow=true;fruit.receiveShadow=true;
+    fruit.userData.pick={kind:'fallen',node:list[i]};   /* 真实任务节点：补点写真数据（R17） */
+    pickMeshes.push(fruit);fg.add(fruit);
+    var stem=new THREE.Mesh(_fruitStemGeo,stemMat);
+    stem.scale.set(r*.06,r*.45,r*.06);
+    stem.position.y=r*1.72+r*.22;
+    stem.rotation.z=(Math.random()-.5)*.35;
+    stem.castShadow=true;fg.add(stem);
+    var leaf=new THREE.Mesh(_fruitLeafGeo,leafMats[i%leafMats.length]);
+    leaf.scale.setScalar(r*.30);
+    leaf.position.set(r*.18,r*2.02,0);
+    leaf.rotation.set(-Math.PI/2+(Math.random()-.5)*.35,Math.random()*Math.PI*2,0);
+    leaf.castShadow=true;fg.add(leaf);
+    var ring=new THREE.Mesh(_fruitRingGeo,ringMat);
+    ring.rotation.x=-Math.PI/2;
+    ring.position.y=.18;
+    ring.scale.setScalar(r*1.55);
+    fg.add(ring);
+    var glow=new THREE.Sprite(glowMat);
+    glow.position.y=r*.9;
+    glow.scale.set(r*3.0,r*3.0,1);
+    fg.add(glow);
+    g.add(fg);
   }
   scene.add(g);_fruitGroup=g;
 }
 function removeFallenFruits(){
   if(!_fruitGroup)return;
+  var mats=new Set();
   _fruitGroup.traverse(function(o){
-    if(o.isMesh){
+    if(o.userData&&o.userData.pick){
       var i=pickMeshes.indexOf(o);
       if(i>=0)pickMeshes.splice(i,1);
-      if(o.geometry)o.geometry.dispose();
-      if(o.material)o.material.dispose();
     }
+    if(o.material&&!mats.has(o.material)){mats.add(o.material);o.material.dispose()}
   });
   scene.remove(_fruitGroup);_fruitGroup=null;
+  if(_fruitGeo){_fruitGeo.dispose();_fruitGeo=null}
+  if(_fruitStemGeo){_fruitStemGeo.dispose();_fruitStemGeo=null}
+  if(_fruitLeafGeo){_fruitLeafGeo.dispose();_fruitLeafGeo=null}
+  if(_fruitRingGeo){_fruitRingGeo.dispose();_fruitRingGeo=null}
+  if(_fruitGlowTex){_fruitGlowTex.dispose();_fruitGlowTex=null}
 }
 /* ---------- 落叶堆 3D（05.3：石环内左前侧草坪，点击回看欠账） ---------- */
 var _pileLeafGeo=null,_pileMoundGeo=null;
@@ -884,7 +949,7 @@ function buildLeafPile(list){
   });
   var leaves=new THREE.InstancedMesh(_pileLeafGeo,leafMat,n);
   leaves.frustumCulled=false;                  /* 实例分布远大于单片叶的包围球 */
-  leaves.castShadow=true;leaves.receiveShadow=true;
+  leaves.castShadow=false;leaves.receiveShadow=true;   /* 丘体投影即可，避免单片叶投出孤立大黑影 */
   var dummy=new THREE.Object3D();
   var zAxis=new THREE.Vector3(0,0,1),nrm=new THREE.Vector3();
   var quat=new THREE.Quaternion(),spin=new THREE.Quaternion(),col=new THREE.Color();
