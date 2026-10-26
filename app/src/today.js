@@ -6,7 +6,7 @@ import {scene} from './scene.js';
 import {data} from './state.js';
 import {updateTask,updateTemp,touch,addTemp,removeTemp} from './mutations.js';
 import {notify} from './notify.js';
-import {today,dayLabel,weekKeyOf,weekDays,addDays,parse,dstr,dayCapOf,effD} from './calendar.js';
+import {today,dayLabel,weekKeyOf,weekDays,addDays,parse,dstr,dayCapOf,effD,effW} from './calendar.js';
 import {setWeek,ensureWeekCSS} from './weekview.js';
 import {flyWeekBubbles} from './transition.js';
 import {frameToday} from './camera.js';
@@ -711,35 +711,46 @@ var _lastListDay=null;   /* 交互优化：同日重渲染保持清单滚动位�
 export function weekTreeMounted(){return _inToday}
 
 /* 虚拟周树（05.1）：主干 → 一级枝（每目标一枝 + 临时枝）→ 果。
-   口径=该周已落日/已补点任务"不多不少"：含完成（树语言之金叶）；
+   口径=有效周=本周的任务（含只排到周、未落日）：完成=金叶；
    本周超时**保留在树上**为断梢+红光（R21），同时树下生成可点击落果。
    **空枝不渲染**：本周无叶的目标枝/临时枝不挂——空分组会被树管线当成
    无排期叶渲染成断梢红光（v4），周树只显示落实到本周的任务。 */
 function buildWeekVTree(t0,vw){
   var vroot={id:-1,title:'本周',depth:0,parent:null,children:[],lvl:'virtual',_virtual:true};
   var inWeek=function(d){return d&&weekKeyOf(parse(d))===vw};
-  var isFallen=function(d,prog){return prog<1&&!!d&&d<t0.d};   /* R21：本周超时 → 断梢+落果 */
-  function wrap(real,overdue){
+  var isFallen=function(d,prog){return prog<1&&!!d&&inWeek(d)&&d<t0.d};   /* R21：本周超时 → 断梢+落果 */
+  /* 本周任务口径：有效周=本周，或日/补点落在本周。
+     只排到周、未落日的任务也算本周任务，保留在树上（花/果态）。 */
+  var isWeekTask=function(n){
+    if(effW(n)===vw)return true;
+    if(n.assignD&&inWeek(n.assignD))return true;
+    if(n.makeup&&inWeek(n.makeup))return true;
+    return false;
+  };
+  function wrap(real,overdue,weekKey){
     return{id:real.id,title:real.title,depth:2,parent:null,children:[],leaf:true,
       hours:real.hours||0,progress:real.progress||0,overdue:!!overdue,
-      lvl:real.lvl||'week',assignD:real.makeup||real.assignD||null,assignW:real.assignW,
+      lvl:real.lvl||'week',assignD:real.makeup||real.assignD||null,
+      assignW:real.assignW||weekKey||null,
       makeup:real.makeup,order:real.order,checklist:real.checklist,_real:real};
   }
   treeRoots().forEach(function(root){
     var goal={id:-root.id,title:root.title,depth:1,parent:vroot,children:[],lvl:'group',_group:true};
     q.allLeaves([root]).forEach(function(l){
-      var d=l.makeup||l.assignD||effD(l);
-      if(!d||!inWeek(d))return;
-      var c=wrap(l,isFallen(d,l.progress));c.parent=goal;goal.children.push(c);
+      if(!isWeekTask(l))return;
+      var d=l.makeup||l.assignD||effD(l)||null;
+      var c=wrap(l,isFallen(d,l.progress),vw);c.parent=goal;goal.children.push(c);
     });
     if(goal.children.length)vroot.children.push(goal);      /* 空枝不挂 */
   });
-  /* 临时任务枝（仅当本周有临时任务才挂，含完成态） */
+  /* 临时任务枝：本周有日/补点归属的任务 + 当前周未落日的全局日程池 */
   var tempBranch={id:-999,title:'临时任务',depth:1,parent:vroot,children:[],lvl:'group',_group:true,_temp:true};
+  var isCurWeek=vw===weekKeyOf(parse(t0.d));
   (data.temps||[]).forEach(function(t){
-    var d=t.makeup||t.assignD;
-    if(!d||!inWeek(d))return;
-    var c=wrap(t,isFallen(d,t.progress));c.parent=tempBranch;tempBranch.children.push(c);
+    var d=t.makeup||t.assignD||null;
+    var inPool=isWeekTask(t)||(!t.assignD&&isCurWeek);
+    if(!inPool)return;
+    var c=wrap(t,isFallen(d,t.progress),vw);c.parent=tempBranch;tempBranch.children.push(c);
   });
   if(tempBranch.children.length)vroot.children.push(tempBranch);   /* 空枝不挂 */
   vroot.children.forEach(function(g){g.children.forEach(function(c){c.parent=g})});
