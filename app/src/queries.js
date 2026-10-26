@@ -2,7 +2,7 @@
  * @file 查询层（选择器）——派生集合的唯一口径
  * 全部纯函数，入参显式传 root/roots，node 可单测。
  */
-import {effM,effW,effD,weekKeyOf,parse} from './calendar.js';
+import {effM,effW,effD,weekKeyOf,weekDays,parse} from './calendar.js';
 
 /** @typedef {{id:number,title:string,depth:number,parent:Node|null,children:Node[],leaf?:boolean,hours?:number,lvl?:string,assignM?:string,assignW?:string,assignD?:string,planned?:boolean,progress?:number,overdue?:boolean,abandoned?:boolean,makeup?:string,order?:number,checklist?:Array<{t:string,done:boolean}>,ph?:string}} Node */
 
@@ -223,8 +223,10 @@ export function fallenFruits(roots,temps,weekKey,dayKey){
 }
 
 /**
- * R21 落叶堆（历史欠账）：assignD < weekStart(本周起始日=周日) && 无有效补点
- * （makeup 缺失或已过期 < 今天）&& progress<1。含临时任务。
+ * R21 落叶堆（历史欠账）+ R58 跨周未落日欠账。
+ * R21：有效日 < weekStart(本周起始日=周日) && 无有效补点 && progress<1。
+ * R58：有效日为空、有效周为历史周（周起始日 < 本周起始日）&& 无有效补点 && progress<1。
+ * 含临时任务；临时任务没有 assignW 时不进入周度落叶堆。
  * @param {Node[]} roots
  * @param {Object[]} temps
  * @param {string} weekStart 本周起始日 'YYYY-MM-DD'（weekDays(weekKey)[0]）
@@ -233,11 +235,15 @@ export function fallenFruits(roots,temps,weekKey,dayKey){
  */
 export function leafPile(roots,temps,weekStart,dayKey){
   var valid=function(n){
-    if(!n.assignD||n.assignD>=weekStart||n.progress>=1)return false;
-    if(n.makeup&&n.makeup>=weekStart)return false;
-    /* makeup≥weekStart：未过期=有效补点挂枝（R21）；本周内过期=落果（R16"补点也过期才落地"）。
-       剩余=无补点或补点在本周前已过期 → 历史欠账 */
-    return true;
+    if(n.progress>=1)return false;
+    if(n.makeup&&n.makeup>=weekStart)return false;   /* 有效补点：不落地 */
+    var day=effD(n);
+    if(day)return day<weekStart;                     /* R21：日级历史欠账 */
+    /* R58：没有有效日，但有效周已经是历史周 */
+    var wk=effW(n);
+    if(!wk)return false;
+    var ws=weekDays(weekKeyOf(parse(wk)))[0];
+    return ws<weekStart;
   };
   var out=allLeaves(roots).filter(valid);
   return out.concat((temps||[]).filter(valid));

@@ -481,7 +481,7 @@ function injectCSS(){
 #backlogPanel .bl-it{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;
   cursor:pointer;font-size:11.5px;color:var(--lx-text-3)}
 #backlogPanel .bl-it:hover{background:rgba(255,255,255,.04);color:var(--lx-text-1)}
-#backlogPanel .bl-it .num{font-size:10px;color:var(--lx-text-4);width:36px;flex:none}
+#backlogPanel .bl-it .num{font-size:10px;color:var(--lx-text-4);width:46px;flex:none}
 #backlogPanel .bl-it .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #backlogPanel .bl-it .h{font-size:10px;color:var(--lx-text-4)}
 #backlogPanel .bl-empty{font-size:11px;color:var(--lx-text-4);text-align:center;padding:10px 0}
@@ -671,6 +671,13 @@ export function openFallenMkp(node){openMkp(node)}
 
 /* ---------- 落叶堆点击 → 历史欠账清单（interact 'pile' 路由） ---------- */
 var _backlog=null;
+function backlogAnchor(n){
+  if(n.assignD)return (n.assignD||'').slice(5);
+  var w=effW(n);
+  if(!w)return '—';
+  var d=weekDays(weekKeyOf(parse(w)))[0];
+  return '周'+d.slice(5);
+}
 export function openBacklogPanel(){
   closeBacklogPanel();
   var t0=today();
@@ -679,7 +686,7 @@ export function openBacklogPanel(){
   var el=document.createElement('div');el.id='backlogPanel';
   el.innerHTML='<div class="bl-head">落叶堆 \u00b7 本周前的欠账 '+ls.length+' 项 \u00b7 点击选补点</div>'+
     (ls.length?ls.map(function(l){
-      return '<div class="bl-it" data-nid="'+l.id+'"><span class="num">'+escHtml((l.assignD||'').slice(5))+'</span>'+
+      return '<div class="bl-it" data-nid="'+l.id+'"><span class="num">'+escHtml(backlogAnchor(l))+'</span>'+
         '<span class="n">'+escHtml(l.title)+'</span><span class="h num">'+Math.round(l.hours||0)+'h</span></div>';
     }).join(''):'<div class="bl-empty">没有历史欠账 🍃</div>');
   document.body.appendChild(el);_backlog=el;
