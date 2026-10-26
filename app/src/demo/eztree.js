@@ -17,6 +17,10 @@ import { buildDecor } from '../../../ez-tree/src/lxp/decor.js';
 import { Tree } from '../../../ez-tree/src/lib/tree.js';
 import TreeOptions from '../../../ez-tree/src/lib/options.js';
 
+function effField(n,key){
+  for(let x=n;x;x=x.parent){if(x[key])return x[key]}
+  return null;
+}
 function toTask(n) {
   const name = n.title || n.name;
   const id = String(n.id);
@@ -24,10 +28,13 @@ function toTask(n) {
     return { id, name, est: n.hours, ch: n.children.map(toTask) };
   }
   const done = (n.progress || 0) >= 1;
-  const planned = !!(n.assignD || n.assignW) && !n.overdue;   /* 周/日=执行轨道；逾期保留断梢+红光 */
+  /* 落日/排周可能继承自父级：真实树必须按有效分配判断，
+     否则父级已落日、叶子自身无 assignD 时会被误画成断梢。 */
+  const effD=effField(n,'assignD'),effW=effField(n,'assignW');
+  const planned = !!(effD || effW || n.makeup) && !n.overdue;
   const h = Math.max(1, n.hours || 2);
   if (done || planned) {
-    return { id, name, est: h, days: [{ n: name, h, w: n.assignW ? 'week' : 'next', done }] };
+    return { id, name, est: h, days: [{ n: name, h, w: effW ? 'week' : 'next', done }] };
   }
   return { id, name, est: h };
 }
