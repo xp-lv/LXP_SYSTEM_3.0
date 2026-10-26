@@ -741,12 +741,34 @@ function buildWeekVTree(t0,vw){
       assignW:real.assignW||weekKey||null,
       makeup:real.makeup,order:real.order,checklist:real.checklist,_real:real};
   }
+  /* 保留真实层级：本周命中的节点作为顶层枝，其子树整体保留；
+     叶子只负责状态（花/断梢/金叶），容器继续做枝干。 */
+  function buildBranch(real){
+    if(!real.children||!real.children.length){
+      var d=real.makeup||real.assignD||effD(real)||null;
+      return wrap(real,isFallen(d,real.progress),vw);
+    }
+    var node={id:real.id,title:real.title,depth:2,parent:null,children:[],
+      leaf:false,hours:real.hours||0,progress:real.progress||0,overdue:false,
+      lvl:real.lvl||'week',assignD:real.makeup||real.assignD||null,
+      assignW:real.assignW||vw,makeup:real.makeup,order:real.order,
+      checklist:real.checklist,_real:real};
+    node.children=real.children.map(buildBranch);
+    node.children.forEach(function(c){c.parent=node});
+    return node;
+  }
+  function collectTopWeek(n,out){
+    (n.children||[]).forEach(function(c){
+      if(isWeekTask(c)){out.push(c);return}
+      if(c.children&&c.children.length)collectTopWeek(c,out);
+    });
+  }
   treeRoots().forEach(function(root){
     var goal={id:-root.id,title:root.title,depth:1,parent:vroot,children:[],lvl:'group',_group:true};
-    q.allLeaves([root]).forEach(function(l){
-      if(!isWeekTask(l))return;
-      var d=l.makeup||l.assignD||effD(l)||null;
-      var c=wrap(l,isFallen(d,l.progress),vw);c.parent=goal;goal.children.push(c);
+    var tops=[];
+    collectTopWeek(root,tops);
+    tops.forEach(function(real){
+      var c=buildBranch(real);c.parent=goal;goal.children.push(c);
     });
     if(goal.children.length)vroot.children.push(goal);      /* 空枝不挂 */
   });
