@@ -29,7 +29,19 @@ const undoStack=createUndoStack(50);
    （多树 undo 硬约束——跨树快照不得覆写他树，见功能说明 §3.7） */
 var treeResolver=null;
 export function setTreeResolver(fn){treeResolver=fn}
-function tempsClone(){return JSON.parse(JSON.stringify(data.temps||[]))}
+function cloneTemp(t){
+  const o={};
+  for(const k in t)if(k!=='parent'&&k!=='children')o[k]=t[k];
+  o.children=(t.children||[]).map(cloneTemp);
+  return o;
+}
+function linkTempParents(list,parent){
+  (list||[]).forEach(function(t){
+    t.parent=parent||null;
+    linkTempParents(t.children,t);
+  });
+}
+function tempsClone(){return (data.temps||[]).map(cloneTemp)}
 /* 虚拟根判定：今日页用 _virtual，周规划页用 _virtualRoot——两者都不是真树，
    快照不得带树（否则 treeResolver 判废、temp 增删无法撤销） */
 function isVirtualRoot(){
@@ -63,7 +75,10 @@ function applySnap(entry){
       n.children.forEach(c=>{c.parent=n;fixDepth(c,d+1)});
     })(root,0);
   }
-  if(entry.temps!==undefined)data.temps=JSON.parse(JSON.stringify(entry.temps));
+  if(entry.temps!==undefined){
+    data.temps=entry.temps.map(cloneTemp);
+    linkTempParents(data.temps,null);
+  }
   return true;
 }
 export function undo(){
@@ -86,8 +101,16 @@ export function redo(){
 }
 
 /* 临时任务写口（G1：此前 today 直改字段绕过本模块） */
+function findTemp(list,id){
+  for(const t of list||[]){
+    if(t.id===id)return t;
+    const c=findTemp(t.children,id);
+    if(c)return c;
+  }
+  return null;
+}
 export function updateTemp(id,patch){
-  const t=(data.temps||[]).find(function(x){return x.id===id});
+  const t=findTemp(data.temps,id);
   if(!t)return null;
   Object.assign(t,patch||{});
   if(t.progress!==undefined){
@@ -105,16 +128,28 @@ export function addTemp(fields){
   const f=fields||{};
   const t={id:allocId(),title:f.title||'临时任务',hours:+f.hours||0,lvl:'temp',
     assignD:f.assignD||null,assignW:f.assignW||null,progress:0,
-    order:f.order!=null?f.order:null};
+    order:f.order!=null?f.order:null,
+    parent:null,depth:0,children:[],leaf:true};
   data.temps.push(t);
   touch();
   return t;
 }
 export function removeTemp(id){
-  const i=(data.temps||[]).findIndex(function(t){return t.id===id});
-  if(i<0)return false;
+  function find(list){
+    for(let i=0;i<(list||[]).length;i++){
+      const t=list[i];
+      if(t.id===id)return{list,i,t};
+      const hit=find(t.children);
+      if(hit)return hit;
+    }
+    return null;
+  }
+  const loc=find(data.temps);
+  if(!loc)return false;
   pushUndo();
-  data.temps.splice(i,1);
+  loc.list.splice(loc.i,1);
+  if(loc.t.parent&&loc.t.parent.children&&loc.t.parent.children.length===0)
+    loc.t.parent.leaf=true;
   touch();
   return true;
 }
@@ -139,21 +174,23 @@ export function touch(){
    若 parent 原是叶子，会自动升级为容器节点（其自身进度字段退役，聚合改由子节点决定）。 */
 export function addSubtask(parent,fields){
   if(!parent)throw new Error('addSubtask: 缺少父节点');
-  if(parent.parent===null&&parent!==data.root)throw new Error('addSubtask: 非法父节点');
+  const isTemp=parent.lvl==='temp';
+  if(!isTemp&&parent.parent===null&&parent!==data.root)throw new Error('addSubtask: 非法父节点');
   const f=fields||{};
   pushUndo();
-  assertInvariant(parent,{lvl:f.lvl||parent.lvl||'top'});
+  if(!isTemp)assertInvariant(parent,{lvl:f.lvl||parent.lvl||'top'});
+  parent.children=parent.children||[];
   const node={
     id:allocId(),
     title:f.title||('新任务'+(parent.children.length+1)),
-    depth:parent.depth+1,
+    depth:(parent.depth||0)+1,
     parent,
     children:[],
     leaf:true,
     progress:f.progress>=1?1:0,
     hours:Math.max(0.5,+f.hours||2),
     overdue:!!f.overdue,
-    lvl:f.lvl||parent.lvl||'top'                   // 级别标签：top/month/week
+    lvl:f.lvl||(isTemp?'temp':parent.lvl)||'top'   // 临时任务子级仍是 temp
   };
   if(parent.leaf){                       // 叶 → 容器：退役自身物候字段
     parent.leaf=false;

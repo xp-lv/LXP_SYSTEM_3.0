@@ -775,7 +775,7 @@ function buildWeekVTree(t0,vw){
   /* 临时任务枝：本周有日/补点归属的任务 + 当前周未落日的全局日程池 */
   var tempBranch={id:-999,title:'临时任务',depth:1,parent:vroot,children:[],lvl:'group',_group:true,_temp:true};
   var isCurWeek=vw===weekKeyOf(parse(t0.d));
-  (data.temps||[]).forEach(function(t){
+  q.allLeaves(data.temps||[]).forEach(function(t){
     var d=t.makeup||t.assignD||null;
     var inPool=isWeekTask(t)||(!t.assignD&&isCurWeek);
     if(!inPool)return;

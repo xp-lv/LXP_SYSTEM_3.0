@@ -356,14 +356,15 @@ export function renderWeek(dir){
     padBottom:12,    /* 日分配列在布局流内，底部只留呼吸空间 */
     hoursEditable:!_ro,
     canPlus:function(n){
-      return !_ro&&!n._virtualRoot&&!n._group&&n.lvl!=='temp'&&
+      return !_ro&&!n._virtualRoot&&!n._group&&
         (n.hours||0)>0&&weekDepth(n)<2;
     },
     ops:{
       divide:function(parent,fields){
         if(_ro||parent._group||parent._virtualRoot)return null;
         var f=fields||{};
-        var c=addSubtask(parent,{title:f.title||'',hours:f.hours!=null?f.hours:2,lvl:'week'});
+        var c=addSubtask(parent,{title:f.title||'',hours:f.hours!=null?f.hours:2,
+          lvl:parent.lvl==='temp'?'temp':'week'});
         setTimeout(refreshDayRail,0);          /* 新子任务带默认工时 → 泡泡负载即时更新 */
         return c;
       },
@@ -460,14 +461,14 @@ export function renderWeek(dir){
         return !!(n.parent&&!n.parent._virtualRoot);
       },
       siblingsOf:function(n){
-        if(n.lvl==='temp')return data.temps||[];
+        if(n.lvl==='temp')return n.parent?n.parent.children:(data.temps||[]);
         var g=weekGroupOf(n);
         if(g)return g.children;
         return n.parent?n.parent.children:[];
       },
       onReorder:function(n,before,after){
         if(n.lvl==='temp'){
-          var arr=data.temps||[];
+          var arr=n.parent?n.parent.children:(data.temps||[]);
           var from=arr.indexOf(n);if(from<0)return false;
           var to=before?arr.indexOf(before):arr.length;
           if(to<0)return false;
@@ -732,9 +733,16 @@ function nodeByIdGlobal(id){
   return r;
 }
 function tempById(id){
-  var ts=data.temps||[];
-  for(var i=0;i<ts.length;i++)if(ts[i].id===id)return ts[i];
-  return null;
+  function find(list){
+    for(var i=0;i<(list||[]).length;i++){
+      var t=list[i];
+      if(t.id===id)return t;
+      var c=find(t.children);
+      if(c)return c;
+    }
+    return null;
+  }
+  return find(data.temps);
 }
 function resolveNode(el){
   var id=+el.dataset.nid;

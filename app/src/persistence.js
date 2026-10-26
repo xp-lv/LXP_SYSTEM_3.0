@@ -67,21 +67,32 @@ function revive(p,parent,depth){
   return n;
 }
 
-/* —— 临时任务（全局日程池，《6》§B：含 order/completedAt） —— */
+/* —— 临时任务（全局日程池，《6》§B：含 order/completedAt；支持子级） —— */
 export function serializeTemp(t){
-  const o={id:t.id,title:t.title,hours:+t.hours||0};
-  if(t.assignD)o.assignD=t.assignD;
-  if(t.assignW)o.assignW=t.assignW;
-  if(t.makeup)o.makeup=t.makeup;
-  if(t.order!=null)o.order=t.order;
-  if(t.progress){o.progress=1;if(t.completedAt)o.completedAt=t.completedAt}
-  return o;
+  function plain(x){
+    const o={id:x.id,title:x.title,hours:+x.hours||0};
+    if(x.leaf===false)o.leaf=false;
+    if(x.assignD)o.assignD=x.assignD;
+    if(x.assignW)o.assignW=x.assignW;
+    if(x.makeup)o.makeup=x.makeup;
+    if(x.order!=null)o.order=x.order;
+    if(x.progress){o.progress=1;if(x.completedAt)o.completedAt=x.completedAt}
+    if(x.children&&x.children.length)o.children=x.children.map(plain);
+    return o;
+  }
+  return plain(t);
 }
-export function reviveTemp(p){
-  return{id:p.id,title:p.title,hours:+p.hours||0,lvl:'temp',
+export function reviveTemp(p,parent,depth){
+  const t={id:p.id,title:p.title,hours:+p.hours||0,lvl:'temp',
+    parent:parent||null,depth:depth||0,children:[],leaf:p.leaf!==false,
     assignD:p.assignD||null,assignW:p.assignW||null,makeup:p.makeup||null,
     order:p.order!=null?p.order:null,
     progress:p.progress?1:0,completedAt:p.completedAt||null};
+  (p.children||[]).forEach(c=>{
+    t.children.push(reviveTemp(c,t,(depth||0)+1));
+  });
+  if(t.children.length)t.leaf=false;
+  return t;
 }
 
 /* —— 文档组装/校验 —— */
@@ -107,7 +118,12 @@ function assertUniqueIds(doc){
       if(seen.has(n.id))throw new Error('id 重复: '+n.id+'（'+n.title+'）');
       seen.add(n.id);(n.children||[]).forEach(w)})(t);
   }
-  for(const tp of doc.temps||[])if(seen.has(tp.id))throw new Error('id 重复(temp): '+tp.id);
+  for(const tp of doc.temps||[]){
+    (function w(t){
+      if(seen.has(t.id))throw new Error('id 重复(temp): '+t.id);
+      seen.add(t.id);(t.children||[]).forEach(w);
+    })(tp);
+  }
 }
 export function writeDoc(doc){
   try{

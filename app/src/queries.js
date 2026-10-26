@@ -193,7 +193,8 @@ export function dayItems(roots,dayKey,temps){
     var d=l.makeup||effD(l);
     if(d===dayKey)out.push(l);
   });
-  (temps||[]).forEach(function(t){if((t.makeup||t.assignD)===dayKey)out.push(t)});
+  /* 临时任务支持子级：只按叶子落日 */
+  allLeaves(temps||[]).forEach(function(t){if((t.makeup||t.assignD)===dayKey)out.push(t)});
   return out;
 }
 
@@ -214,7 +215,7 @@ export function fallenFruits(roots,temps,weekKey,dayKey){
     if(!d||l.progress>=1)return;
     if(weekKeyOf(parse(d))===weekKey&&d<dayKey)out.push(l);
   });
-  (temps||[]).forEach(function(t){
+  allLeaves(temps||[]).forEach(function(t){
     var d=t.makeup||t.assignD;
     if(!d||t.progress>=1)return;
     if(weekKeyOf(parse(d))===weekKey&&d<dayKey)out.push(t);
@@ -246,7 +247,7 @@ export function leafPile(roots,temps,weekStart,dayKey){
     return ws<weekStart;
   };
   var out=allLeaves(roots).filter(valid);
-  return out.concat((temps||[]).filter(valid));
+  return out.concat(allLeaves(temps||[]).filter(valid));
 }
 
 /**

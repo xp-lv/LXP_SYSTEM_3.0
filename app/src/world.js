@@ -131,7 +131,9 @@ export function importDoc(doc){
   data.exec=(doc.exec&&Array.isArray(doc.exec.items))?doc.exec:{items:[],collapsed:false};
   var mx=0;trees.forEach(t=>{var m2=maxIdOf(t);if(m2>mx)mx=m2});
   domains.forEach(d=>{if(d.id>mx)mx=d.id});   /* 领域 ID 也入种子——防新领域分配重复 ID */
-  (data.temps||[]).forEach(t=>{if(t.id>mx)mx=t.id});  /* 临时任务 ID 同理 */
+  (data.temps||[]).forEach(function(t){
+    (function w(x){if(x.id>mx)mx=x.id;(x.children||[]).forEach(w)})(t);
+  });  /* 临时任务及其子级 ID 同理 */
   seedIds(mx);
   _finishInit();
 }

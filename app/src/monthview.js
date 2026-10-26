@@ -6,7 +6,7 @@
    */
 import {data} from './state.js';
 import {addSubtask,removeNode,renameNode,assignPeriod,updateTask,unassignFromMonthDeep,reorderSibling} from './mutations.js';
-import {monthWeeks,weekLabel,weekDays,today} from './calendar.js';
+import {monthWeeks,weekLabel,weekDays,today,weekKeyOf,parse,effW} from './calendar.js';
 import * as q from './queries.js';
 import {createDecomposer} from './modules/decomposer.js';
 import {getSelected,setSelected,colorOf,MONTHS,monthLoad,renderPlan} from './planner.js';
@@ -154,6 +154,19 @@ function buildVirtualTree(mk){
 
 /* 周泡泡负载：统一周任务口径（月度叶子 + 周级叶子 + 补点在本周，已分解父级不重复计） */
 function weekTasks(wk){return q.weekLeaves([data.root],wk)}
+/* 高亮口径包含容器：父级排到本周、子级继承有效周，整段分支都亮 */
+function weekHighlightSet(wk){
+  var set=new Set();
+  (function walk(n){
+    if(!n)return;
+    var inWk=effW(n)===wk;
+    if(!inWk&&n.assignD)inWk=weekKeyOf(parse(n.assignD))===wk;
+    if(!inWk&&n.makeup)inWk=weekKeyOf(parse(n.makeup))===wk;
+    if(inWk)set.add(n);
+    (n.children||[]).forEach(walk);
+  })(data.root);
+  return set;
+}
 
 export function renderDetail(){
   injectCSS();
@@ -389,9 +402,8 @@ function highlightWeek(wk,on,cloud){
   if(!area)return;
   var rm=area._rowMap||[];
   if(on){
-    var match=new Set(),keep=new Set();
-    weekTasks(wk).forEach(function(t){
-      match.add(t);
+    var match=weekHighlightSet(wk),keep=new Set();
+    match.forEach(function(t){
       for(var x=t;x;x=x.parent)keep.add(x);
     });
     area.querySelectorAll('.dc-node').forEach(function(el){
