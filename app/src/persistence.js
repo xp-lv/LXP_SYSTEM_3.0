@@ -33,6 +33,7 @@ export function serializeTree(root){
     if(n.assignD)o.assignD=n.assignD;
     if(n.makeup)o.makeup=n.makeup;
     if(n.order!=null)o.order=n.order;
+    if(n.wOrder!=null)o.wOrder=n.wOrder;
     if(n.checklist)o.checklist=n.checklist.map(c=>({t:c.t,done:!!c.done}));
     if(n.children&&n.children.length)o.children=n.children.map(plain);
     return o;
@@ -59,6 +60,7 @@ function revive(p,parent,depth){
   if(p.assignD)n.assignD=p.assignD;
   if(p.makeup)n.makeup=p.makeup;
   if(p.order!=null)n.order=p.order;
+  if(p.wOrder!=null)n.wOrder=p.wOrder;
   if(p.checklist)n.checklist=p.checklist.map(c=>({t:c.t,done:!!c.done}));
   (p.children||[]).forEach(c=>{n.children.push(revive(c,n,depth+1))});
   if(n.children.length)n.leaf=false;

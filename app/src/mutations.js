@@ -55,7 +55,7 @@ function applySnap(entry){
     const root=entry.tree;
     // 复制原子字段到现有 root 对象（保留引用，3D 模块仍指向它）
     ['id','title','leaf','hours','lvl','planned','progress','overdue','completedAt',
-     'assignM','assignW','assignD','makeup','order','checklist'].forEach(k=>root[k]=revived[k]);
+     'assignM','assignW','assignD','makeup','order','wOrder','checklist'].forEach(k=>root[k]=revived[k]);
     root.children=revived.children;
     // 重建 depth 与 parent（快照不含派生字段）
     (function fixDepth(n,d){

@@ -76,6 +76,7 @@ export function snapNode(n){
     completedAt:n.completedAt||null,
     assignM:n.assignM||null,assignW:n.assignW||null,assignD:n.assignD||null,
     makeup:n.makeup||null,order:n.order!=null?n.order:null,
+    wOrder:n.wOrder!=null?n.wOrder:null,
     checklist:(n.checklist||null)&&n.checklist.map(c=>({t:c.t,done:!!c.done})),
     children:(n.children||[]).map(snapNode)};
 }
@@ -92,6 +93,7 @@ export function reviveNode(snap){
     assignM:snap.assignM,assignW:snap.assignW,
     assignD:snap.assignD,makeup:snap.makeup||null,
     order:snap.order!=null?snap.order:null,
+    wOrder:snap.wOrder!=null?snap.wOrder:null,
     checklist:(snap.checklist||null)&&snap.checklist.map(c=>({t:c.t,done:!!c.done})),
     children:[]};
   (snap.children||[]).forEach(c=>{

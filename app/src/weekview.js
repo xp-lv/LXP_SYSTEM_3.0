@@ -42,6 +42,10 @@ function allTreeRoots(){
 
 /* 周域深度：月度任务=0，其子=1，孙=2（分解封顶 2 层） */
 function weekDepth(n){var d=0;for(var x=n;x&&x.parent&&x.lvl!=='month';x=x.parent)d++;return d}
+/* 顶层目标组：周画布上直接挂在某棵目标树下的任务，共享一个组内顺序 */
+function weekGroupOf(n){
+  return n&&n._wkGroup&&n._wkGroup.children.indexOf(n)>=0?n._wkGroup:null;
+}
 
 /* 临时任务：已落日的按周归属；未落日的属于全局日程池（当前/未来周可见可拖） */
 function tempPoolFor(wkKey,future){
@@ -63,18 +67,33 @@ function wkOfKey(dk){return weekKeyOf(new Date(dk.replace(/-/g,'/')))}
 /* ---------- 虚拟树：根「本周」→ 目标分组 → 周任务（真实节点直挂） ---------- */
 function buildWeekTree(wkKey,future){
   var vroot={title:wkLabel(wkKey),children:[],_virtualRoot:true};
+  /* 清掉上一轮渲染留下的组引用，避免已移出本周的节点继续用旧组排序 */
+  allTreeRoots().forEach(function(tr){
+    (function clr(n){n._wkGroup=null;(n.children||[]).forEach(clr)})(tr);
+  });
   allTreeRoots().forEach(function(tr){
     var list=[];
     (function w(n){
       n.children.forEach(function(c){
-        if(c.lvl==='month'||c.lvl==='week'){
-          var inWk=effW(c)===wkKey||(c.makeup&&wkOfKey(c.makeup)===wkKey);
-          if(inWk){list.push(c);return}   /* 命中即收；其分解子级由画布递归呈现 */
-        }
+        /* 所有“有效周=本周”的任务都入画布，不再只限 month/week：
+           顶层任务、周任务、只分配到周未落日的任务都要显示。 */
+        var inWk=effW(c)===wkKey||(c.makeup&&wkOfKey(c.makeup)===wkKey);
+        if(inWk){list.push(c);return}   /* 命中即收；其分解子级由画布递归呈现 */
         if(c.children.length)w(c);
       });
     })(tr);
-    if(list.length)vroot.children.push({title:tr.title,_real:tr,_group:true,lvl:'top',children:list});
+    if(list.length){
+      list.sort(function(a,b){
+        var ao=a.wOrder,bo=b.wOrder;
+        if(ao==null&&bo==null)return 0;
+        if(ao==null)return 1;
+        if(bo==null)return -1;
+        return ao-bo;
+      });
+      var group={title:tr.title,_real:tr,_group:true,lvl:'top',children:list};
+      list.forEach(function(c){c._wkGroup=group});
+      vroot.children.push(group);
+    }
   });
   var temps=tempPoolFor(wkKey,future);
   if(temps.length)vroot.children.push({title:'日程',_group:true,_temp:true,lvl:'temp',children:temps});
@@ -350,13 +369,15 @@ export function renderWeek(dir){
       },
       remove:function(node){
         if(_ro||node._group||node._virtualRoot)return false;
-        /* 交互优化：删除带子任务的任务先确认（叶子直接删，可撤销） */
-        if(node.children&&node.children.length&&
+        /* 只有周任务删除子树；顶层/月度任务是从本周移出，不删树 */
+        if(node.lvl==='week'&&node.children&&node.children.length&&
           !confirm('删除「'+node.title+'」及其全部子任务？'))return false;
         if(node.lvl==='temp'){
           removeTemp(node.id);               /* 可撤销（R34） */
         }else if(node.lvl==='month'){
           unassignPeriod(node,'w');            /* 月度任务移出本周（保留任务本身） */
+        }else if(node.lvl==='top'){
+          unassignPeriod(node,'w');            /* 顶层任务只移出本周 */
         }else if(node.lvl==='week'){
           removeNode(node);                    /* 周任务=删除子树 */
         }else return false;
@@ -403,7 +424,7 @@ export function renderWeek(dir){
     drag:{
       canDrag:function(n){
         if(_ro||n._virtualRoot||n._group)return false;
-        if(!(n.lvl==='month'||n.lvl==='week'||n.lvl==='temp'))return false;
+        /* 本周画布上的所有真实叶子都可拖到日期列；不再限 month/week */
         return isLeafN(n);
       },
       dropSelector:'#wkDayRail .wk-day',
@@ -434,10 +455,14 @@ export function renderWeek(dir){
       canReorder:function(n){
         if(_ro||n._virtualRoot||n._group)return false;
         if(n.lvl==='temp')return true;
-        return !!(n.parent&&!n.parent._virtualRoot&&(n.lvl==='month'||n.lvl==='week'));
+        /* 顶层目标组内：不要求真实父级相同，所有周任务都可调顺序 */
+        if(weekGroupOf(n))return true;
+        return !!(n.parent&&!n.parent._virtualRoot);
       },
       siblingsOf:function(n){
         if(n.lvl==='temp')return data.temps||[];
+        var g=weekGroupOf(n);
+        if(g)return g.children;
         return n.parent?n.parent.children:[];
       },
       onReorder:function(n,before,after){
@@ -453,6 +478,25 @@ export function renderWeek(dir){
           arr.splice(from,1);
           if(to>from)to--;
           arr.splice(to,0,n);
+          touch();
+          renderWeek();
+          return true;
+        }
+        var group=weekGroupOf(n);
+        if(group){
+          /* 同一顶层目标下的卡片顺序：写 wOrder，不改真实父子关系 */
+          var ga=group.children;
+          var gf=ga.indexOf(n);if(gf<0)return false;
+          var gt=before?ga.indexOf(before):ga.length;
+          if(gt<0)return false;
+          if(after)gt++;
+          if(gt>ga.length)gt=ga.length;
+          if(gt===gf||gt===gf+1)return false;
+          snapshot();
+          ga.splice(gf,1);
+          if(gt>gf)gt--;
+          ga.splice(gt,0,n);
+          ga.forEach(function(x,i){var r=x._real||x;r.wOrder=i});
           touch();
           renderWeek();
           return true;
