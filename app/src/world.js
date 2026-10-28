@@ -2,7 +2,7 @@ import THREE from './three.js';
 import {scene} from './scene.js';
 import {state,data} from './state.js';
 import {clamp} from './utils.js';
-import {makeTopTree,allocId,seedIds,maxIdOf,derive} from './data.js';
+import {makeTopTree,allocId,seedIds,derive} from './data.js';
 import {rebuild,treeHeightOf} from './tree.js';
 import {setCamHome,sphGoal,tgtGoal} from './camera.js';
 import {renderCrumb} from './ui.js';
@@ -129,12 +129,12 @@ export function importDoc(doc){
   data.caps=doc.caps||{day:6,weekend:0};
   data.orchard=doc.orchard||[];
   data.exec=(doc.exec&&Array.isArray(doc.exec.items))?doc.exec:{items:[],collapsed:false};
-  var mx=0;trees.forEach(t=>{var m2=maxIdOf(t);if(m2>mx)mx=m2});
-  domains.forEach(d=>{if(d.id>mx)mx=d.id});   /* 领域 ID 也入种子——防新领域分配重复 ID */
-  (data.temps||[]).forEach(function(t){
-    (function w(x){if(x.id>mx)mx=x.id;(x.children||[]).forEach(w)})(t);
-  });  /* 临时任务及其子级 ID 同理 */
-  seedIds(mx);
+  /* 回播既有 id：按“段内序号”逐个喂给 seedIds（不能只看全局最大值——
+     其它客户端的段可能更大，会漏掉本段旧 id 造成重号） */
+  function seedNode(n){seedIds(n.id);(n.children||[]).forEach(seedNode)}
+  trees.forEach(seedNode);
+  domains.forEach(function(d){seedIds(d.id)});
+  (data.temps||[]).forEach(seedNode);
   _finishInit();
 }
 function _finishInit(){
@@ -338,11 +338,13 @@ export function treeIndexOf(tree){
 }
 export {TREE_CAP,islandRadiusOf,getTreeWorldPos,slotOf,crownScaleOf};
 
-/* ================= 存档导出（main 持久化用） ================= */
+/* ================= 存档导出（main 持久化用） =================
+   temps 必须走 serializeTemp：实时节点带 parent 指针，直接 JSON 序列化会
+   循环引用（云同步推送整包失败），且 parent/children 是运行期派生字段。 */
 export function exportDoc(){
   return{domains:domains.map(d=>({id:d.id,name:d.name,color:d.color})),
     trees:trees.map(t=>persist.serializeTree(t)),
     island:{treeSlots:island.treeSlots.map(s=>({x:s.x,z:s.z,h:s.h,r:s.r,treeId:s.treeId}))},
     active:{domainId:activeDomainId,treeId:activeTreeId},
-    temps:data.temps,caps:data.caps,orchard:data.orchard||[],exec:data.exec};
+    temps:(data.temps||[]).map(persist.serializeTemp),caps:data.caps,orchard:data.orchard||[],exec:data.exec};
 }

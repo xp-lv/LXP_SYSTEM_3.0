@@ -1,5 +1,6 @@
 import {mulberry32} from './utils.js';
 import {data} from './state.js';
+import {today,isOverdue} from './calendar.js';
 
 /* 任务字段约定（叶节点原子字段，物候态由此推导，杜绝矛盾组合）：
    planned 已排期 / progress 完成二值 0|1 / effort 投入度 0..1（驱动青柿→黄柿的连续物候）
@@ -9,30 +10,53 @@ import {data} from './state.js';
 
 
 
-/* ================= 节点 id 分配器（全局单调，演示数据与后续变更共用） ================= */
-let _uid=1;                       /* D1 已定：起始 1，避免 falsy 陷阱 */
-export function allocId(){return _uid++}
-/* 持久化载入后回播最大 id，防重启后重新分配撞旧档 */
-export function seedIds(maxId){if(maxId>=_uid)_uid=maxId+1}
+/* ================= 节点 id 分配器（单口，演示数据与后续变更共用） =================
+   多端同步：每个客户端都从同一份存档续号会撞 id（两端各建一个任务分到同一个号，
+   合并时被当成同一个任务而丢失）。浏览器每次启动随机一个 16bit 段：
+   id = 段 × 2^37 + 段内序号，仍 ≤ 2^53（JSON 数值安全）。
+   Node 单测不设段（salt=0），保持从 1 递增的原有行为。 */
+const ID_BASE=137438953472;        /* 2^37 */
+let _uid=1,_idSalt=0;             /* D1 已定：起始 1，避免 falsy 陷阱 */
+export function setIdSalt(salt){
+  const n=+salt|0;
+  _idSalt=(n>0&&n<65536)?n:0;
+  _uid=1;
+}
+export function allocId(){return _idSalt*ID_BASE+_uid++}
+/* 持久化载入后回播既有 id，防重启后重新分配撞旧档（只回播本段） */
+export function seedIds(id){
+  if(id==null)return;
+  const base=_idSalt*ID_BASE;
+  if(id>=base&&id<base+ID_BASE){
+    const seq=id-base+1;
+    if(seq>_uid)_uid=seq;
+  }
+}
 export function maxIdOf(root){var m=0;
   (function w(n){if(n.id>m)m=n.id;n.children.forEach(w)})(root);return m}
 
 /* ================= 自底向上聚合：工时桶/完成率/告警态/物候键 =================
    任何数据变更后必须重跑（mutations.refresh 收口调用） */
-export function derive(n){
+export function derive(n,dayKey){
+  dayKey=dayKey||today().d;
   const B={done:0,overdue:0,assigned:0,floating:0};
   if(n.leaf){
     n._stage=null;
+    const ab=!!n.abandoned;
     const doneH=n.hours*(n.progress>=1?1:0);
     B.done+=doneH;
-    if(n.overdue)B.overdue+=n.hours-doneH;
+    /* 逾期按展示层派生（makeup||assignD < 今天）；overdue 标志仅作历史事实。
+       放弃任务不计逾期（R16 四桶约束：不新增 abandoned 桶）。 */
+    const over=!ab&&isOverdue(n,dayKey);
+    if(over)B.overdue+=n.hours-doneH;
+    else if(ab)B.assigned+=n.hours-doneH;
     else if(!n.assignD&&!n.assignW&&!n.assignM)B.floating+=n.hours-doneH;
     else B.assigned+=n.hours-doneH;
-    n.H=n.hours;n.leafCount=1;n.redCount=n.overdue?1:0;
-    n.bare=!(n.progress>=1)&&!n.assignD&&!n.assignW;   /* 断梢：assignM 不影响（已定） */
+    n.H=n.hours;n.leafCount=1;n.redCount=over?1:0;
+    n.bare=!ab&&!(n.progress>=1)&&!n.assignD&&!n.assignW;   /* 断梢：assignM 不影响（已定） */
     if(n.progress>=1&&!n.completedAt)n.completedAt=Date.now();   /* R28：完成时间戳 */
   }else{
-    n.children.forEach(derive);
+    n.children.forEach(function(c){derive(c,dayKey)});
     n.H=n.children.reduce((s,c)=>s+c.H,0);
     for(const k in B)B[k]=n.children.reduce((s,c)=>s+c.buckets[k],0);
     n.leafCount=n.children.reduce((s,c)=>s+c.leafCount,0);

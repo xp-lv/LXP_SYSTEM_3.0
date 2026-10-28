@@ -1,5 +1,6 @@
 import {state} from './state.js';
 import {byId,pathTo} from './data.js';
+import {isOverdue,today} from './calendar.js';
 import {trunc,fmtH} from './utils.js';
 import {AGGNAME} from './config.js';
 import {rebuild} from './tree.js';
@@ -31,9 +32,10 @@ const card=document.getElementById('hoverCard');
 export function updateCard(){
   const n=state.hoverLock||state.hovered;
   if(!n){card.style.display='none';return}
-  const st=n.leaf?(n.progress>=1?'已完成':(n.bare?'断梢 · 未排期':(n.overdue?'已逾期 · 待补点':'已排期')))
+  const leafOver=n.leaf&&isOverdue(n,today().d);
+  const st=n.leaf?(n.abandoned?'已放弃':(n.progress>=1?'已完成':(n.bare?'断梢 · 未排期':(leafOver?'已逾期 · 待补点':'已排期'))))
     :(AGGNAME[n.agg]||'分组');
-  let chips='<span class="chip'+(n.agg==='overdue'?' red':'')+'">'+st+'</span>';
+  let chips='<span class="chip'+((n.leaf?leafOver:n.agg==='overdue')?' red':'')+'">'+st+'</span>';
   if(n.leaf){
     chips+='<span class="chip">'+(n.hours||0)+'h</span>';
     const d=n.makeup||n.assignD;

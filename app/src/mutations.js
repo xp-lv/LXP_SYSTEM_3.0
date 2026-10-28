@@ -1,4 +1,4 @@
-import {data} from './state.js';
+import {data,state} from './state.js';
 import {derive,allocId} from './data.js';
 import {store} from './store.js';
 
@@ -8,6 +8,14 @@ let renderHook=null;
 /* 渲染经注册回调（07.3：变更服务不直连渲染模块）；main 装配时注入 rebuild */
 export function onRender(fn){renderHook=fn}
 function render(){try{renderHook&&renderHook()}catch(e){console.warn('[mutations] render',e)}}
+/* 周/月规划页的 3D canvas 是隐藏的：期间只标记脏，不重建 3D；
+   回到世界/今日时由 views.js 调 renderIfDirty() 补一次。 */
+var _renderDirty=false;
+export function renderIfDirty(){
+  if(!_renderDirty)return;
+  _renderDirty=false;
+  render();
+}
 /* world 依赖惰性化：undo 回放的切树仅浏览器运行期需要（node 单测无 three） */
 var _world=null;function worldLazy(){if(!_world)try{_world=worldRef()}catch(e){}return _world}
 var worldRef=function(){return null};
@@ -66,7 +74,7 @@ function applySnap(entry){
     const revived=reviveNode(entry.snap);
     const root=entry.tree;
     // 复制原子字段到现有 root 对象（保留引用，3D 模块仍指向它）
-    ['id','title','leaf','hours','lvl','planned','progress','overdue','completedAt',
+    ['id','title','leaf','hours','lvl','planned','progress','overdue','abandoned','completedAt',
      'assignM','assignW','assignD','makeup','order','wOrder','checklist'].forEach(k=>root[k]=revived[k]);
     root.children=revived.children;
     // 重建 depth 与 parent（快照不含派生字段）
@@ -160,7 +168,12 @@ export function refresh(){
   if(w&&w.getTrees)w.getTrees().forEach(function(t){if(t!==data.root)derive(t)});
   if(!data.root){render();touch();return}    /* 空树引导态：无数据可派生 */
   derive(data.root);
-  render();
+  if(state.view==='plan'||state.view==='week'){
+    _renderDirty=true;                       /* 隐藏的 3D 留到回世界/今日再重建 */
+  }else{
+    render();
+    _renderDirty=false;
+  }
   touch();
 }
 /* 数据变更广播（分配类原语不重建，也走这里）；
@@ -227,6 +240,17 @@ export function renameNode(node,title){
   pushUndo();
   node.title=title;
   refresh();
+}
+
+/* 批量补点（今日页「全部补到今天」）：一次快照 + 统一刷新；
+   树任务与临时任务都走这里（临时任务不需要 derive，但统一 touch 持久化）。 */
+export function bulkMakeup(items,dayKey){
+  const list=(items||[]).filter(Boolean);
+  if(!list.length)return 0;
+  pushUndo();
+  list.forEach(function(n){n.makeup=dayKey||null});
+  refresh();
+  return list.length;
 }
 
 /* 批量标记逾期（今日页进入时推导：落日已过且未完成） */

@@ -45,6 +45,7 @@ export function monthTopEntries(root,mk){
   if(!root)return[];
   var out=[];
   (function w(n){n.children.forEach(function(c){
+    if(c.abandoned)return;
     if(c.lvl!=='month'&&c.lvl!=='week'){
       if(c.assignM===mk)out.push(c);
       if(c.children.length)w(c);
@@ -62,7 +63,7 @@ export function monthLeafSum(t,mk){
   var s=0;
   (function w(n){n.children.forEach(function(c){
     if(c.children.length)w(c);
-    else if(c.lvl==='month'&&c.assignM===mk)s+=c.hours||0;
+    else if(c.lvl==='month'&&c.assignM===mk&&!c.abandoned)s+=c.hours||0;
   })})(t);
   return s;
 }
@@ -76,7 +77,7 @@ export function countMonthLeaves(t,mk){
   var c=0;
   (function w(n){n.children.forEach(function(x){
     if(x.children.length)w(x);
-    else if(x.lvl==='month'&&x.assignM===mk)c++;
+    else if(x.lvl==='month'&&x.assignM===mk&&!x.abandoned)c++;
   })})(t);
   return c;
 }
@@ -95,7 +96,7 @@ export function monthLoad(root,mk){
   });
   (function w2(n){n.children.forEach(function(c){
     if(c.children.length)w2(c);
-    else if(c.lvl==='month'&&c.assignM===mk){
+    else if(c.lvl==='month'&&c.assignM===mk&&!c.abandoned){
       var t=nearestTop(c);
       if(!(t&&t!==root&&t.assignM===mk))s+=c.hours||0;
     }
@@ -139,7 +140,8 @@ export function pendingOverdue(roots,dayKey){
   var out=[];
   roots.forEach(function(root){
     treeLeaves(root).forEach(function(l){
-      if(l.assignD&&l.assignD<dayKey&&!l.overdue&&!l.abandoned&&l.progress<1)
+      var d=effD(l);
+      if(d&&d<dayKey&&!l.overdue&&!l.abandoned&&l.progress<1)
         out.push(l);
     });
   });
@@ -171,6 +173,7 @@ export function allLeaves(roots){
 export function weekLeaves(roots,wk){
   var out=[];
   allLeaves(roots).forEach(function(l){
+    if(l.abandoned)return;
     if(l.lvl!=='month'&&l.lvl!=='week')return;
     if(effW(l)===wk){out.push(l);return}
     if(l.makeup&&weekKeyOf(parse(l.makeup))===wk)out.push(l);
@@ -190,11 +193,14 @@ export function dayItems(roots,dayKey,temps){
   var out=[];
   /* R17 展示层：归属按有效日 makeup||assignD（单日归属，不双列） */
   allLeaves(roots).forEach(function(l){
+    if(l.abandoned)return;
     var d=l.makeup||effD(l);
     if(d===dayKey)out.push(l);
   });
   /* 临时任务支持子级：只按叶子落日 */
-  allLeaves(temps||[]).forEach(function(t){if((t.makeup||t.assignD)===dayKey)out.push(t)});
+  allLeaves(temps||[]).forEach(function(t){
+    if(t.abandoned)return;
+    if((t.makeup||t.assignD)===dayKey)out.push(t)});
   return out;
 }
 
@@ -211,11 +217,13 @@ export function dayItems(roots,dayKey,temps){
 export function fallenFruits(roots,temps,weekKey,dayKey){
   var out=[];
   allLeaves(roots).forEach(function(l){
+    if(l.abandoned)return;
     var d=l.makeup||effD(l);
     if(!d||l.progress>=1)return;
     if(weekKeyOf(parse(d))===weekKey&&d<dayKey)out.push(l);
   });
   allLeaves(temps||[]).forEach(function(t){
+    if(t.abandoned)return;
     var d=t.makeup||t.assignD;
     if(!d||t.progress>=1)return;
     if(weekKeyOf(parse(d))===weekKey&&d<dayKey)out.push(t);
@@ -236,7 +244,7 @@ export function fallenFruits(roots,temps,weekKey,dayKey){
  */
 export function leafPile(roots,temps,weekStart,dayKey){
   var valid=function(n){
-    if(n.progress>=1)return false;
+    if(n.progress>=1||n.abandoned)return false;
     if(n.makeup&&n.makeup>=weekStart)return false;   /* 有效补点：不落地 */
     var day=effD(n);
     if(day)return day<weekStart;                     /* R21：日级历史欠账 */

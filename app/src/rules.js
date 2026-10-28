@@ -72,7 +72,7 @@ export function createUndoStack(maxSize){
  */
 export function snapNode(n){
   return{id:n.id,title:n.title,leaf:!!n.leaf,hours:n.hours,lvl:n.lvl,
-    progress:n.progress||0,overdue:!!n.overdue,
+    progress:n.progress||0,overdue:!!n.overdue,abandoned:!!n.abandoned,
     completedAt:n.completedAt||null,
     assignM:n.assignM||null,assignW:n.assignW||null,assignD:n.assignD||null,
     makeup:n.makeup||null,order:n.order!=null?n.order:null,
@@ -89,7 +89,8 @@ export function snapNode(n){
 export function reviveNode(snap){
   const n={id:snap.id,title:snap.title,leaf:!!snap.leaf,hours:snap.hours,
     lvl:snap.lvl,progress:snap.progress||0,
-    overdue:!!snap.overdue,completedAt:snap.completedAt||null,
+    overdue:!!snap.overdue,abandoned:!!snap.abandoned,
+    completedAt:snap.completedAt||null,
     assignM:snap.assignM,assignW:snap.assignW,
     assignD:snap.assignD,makeup:snap.makeup||null,
     order:snap.order!=null?snap.order:null,

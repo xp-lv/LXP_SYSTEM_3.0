@@ -14,6 +14,7 @@ import {store} from './store.js';
 import * as persist from './persistence.js';
 import {initDemoPanels} from './demo/panels.js';
 import {initTodayStage} from './today.js';
+import {setIdSalt} from './data.js';
 
 /* ================= 启动装配（main.js） ================= */
 /* 云端同步 v2：拉取 + 推送（乐观锁）+ 定期拉取（多设备同步） */
@@ -38,6 +39,9 @@ import('./sync.js')
 
 function boot(){
 try{
+  /* 多端同步：为本次会话分配独立 id 段（避免各端从同一存档续号撞 id，
+     新任务的 id 因此远大于历史 id；seedIds 按段回播，不影响既有数据） */
+  setIdSalt(1+Math.floor(Math.random()*65535));
   fixAspect();
   (function retryFix(k){
     setTimeout(function(){
@@ -63,25 +67,30 @@ try{
     persist.writeDoc(exportDoc());
     if(_pushOnChange)_pushOnChange(exportDoc);  // 云端同步（防抖 2s；离线时跳过）
   });
-  import('./queries.js').then(function(q){      // 启动全局扫描逾期（A4）
-    import('./calendar.js').then(function(cal){
-      import('./mutations.js').then(function(mut){
+  /* 全局逾期扫描：启动 + 凌晨 5 点跨天都跑（R16/R21/R32） */
+  function scanOverdue(forceRefresh){
+    Promise.all([import('./queries.js'),import('./calendar.js'),import('./mutations.js')])
+      .then(function(m){
+        var q=m[0],cal=m[1],mut=m[2];
         var pend=q.pendingOverdue(getTrees(),cal.today().d);
         if(pend.length>0){
-          console.log('[boot] 全局扫描：',pend.length,'项逾期');
+          console.log('[scan] 全局扫描：',pend.length,'项逾期');
           mut.bulkOverdue(pend);
+        }else if(forceRefresh){
+          mut.refresh();                         /* 日期变化：重算展示层逾期/聚合 */
         }
-      });
-    });
-  });
+      })
+      .catch(function(e){console.warn('[scan]',e.message)});
+  }
+  scanOverdue(false);
   animate();
   var _lastDay=(function(){var s=new Date();s.setHours(s.getHours()-5);return s.getDate()})(); /* R21/R32：凌晨5点分界 */            // 跨天重派生（A5）
   setInterval(function(){
     var s2=new Date();s2.setHours(s2.getHours()-5);var d=s2.getDate(); /* R21/R32：凌晨5点分界 */
     if(d!==_lastDay){
       _lastDay=d;
-      console.log('[auto] 日期变化 → 重新推导');
-      import('./mutations.js').then(function(m){m.refresh()});
+      console.log('[auto] 日期变化 → 重新扫描逾期');
+      scanOverdue(true);
     }
   },60000);
   /* 备份：导出=下载存档 JSON；导入=校验后整体应用（H2/W12）

@@ -16,11 +16,11 @@ import { attachT } from './adapter.js';
 const GOLDEN = 2.39996; // 黄金角 137.5°（rad）
 
 /* 角度分档（度）与分层参数表（layer 0..6 = A,B1,B2,C1,C2,D1,D2） */
-const EXT_ANGLE_SAME = 10;   // 同级延续：近乎续接
-const EXT_ANGLE_CROSS = 28;  // 换级延续：主分岔
-const lateralAngle = layer => Math.min(55, 40 + 3 * layer); // 侧枝扇形随层深递增
-const SEGMENTS_BY_LAYER = [8, 7, 6, 6, 5, 5, 4];
-const G_BASE_BY_LAYER = [0.09, 0.10, 0.11, 0.12, 0.13, 0.14, 0.14];
+const EXT_ANGLE_SAME = 12;   // 同级延续：近乎续接（P1 略增）
+const EXT_ANGLE_CROSS = 32;  // 换级延续：主分岔（P1 更有主次）
+const lateralAngle = layer => Math.min(58, 42 + 3 * layer); // 侧枝扇形随层深递增
+const SEGMENTS_BY_LAYER = [10, 8, 7, 6, 6, 5, 4];          // P1：主干/大枝更圆
+const G_BASE_BY_LAYER = [0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.17]; // P1：更自然的 S 弯
 const TYPE_OF_LAYER = layer => (layer <= 0 ? 'A' : 'ABCD'[Math.floor((layer - 1) / 2)]);
 
 const TIP_T = 0.82;   // 日梢/收敛枝的收尖起点（org 不收尖——被延长枝延续）
@@ -95,7 +95,8 @@ function growBranch({ spec, level, origin, orientation, isLateral }, branches, d
       radius = spec.exitR + (TIP_R - spec.exitR) * Math.pow(k, 1.35);
     }
     if (level === 0) {
-      radius *= 1 + 0.9 * Math.pow(Math.max(0, 1 - t / 0.12), 2); // 根部展宽
+      /* P1：更强的根部展宽（板根感），只影响主干最下段 */
+      radius *= 1 + 1.25 * Math.pow(Math.max(0, 1 - t / 0.16), 2);
     }
 
     const collar = collarK * Math.pow(Math.max(0, 1 - t / 0.26), 1.7);
@@ -168,12 +169,14 @@ function growBranch({ spec, level, origin, orientation, isLateral }, branches, d
       const parentQ = qB.slerp(qA, alpha);
 
       /* 角度分档：延长枝同级小角/换级大角；侧枝扇形随层深，
-         并按挂高做形态梯度（低处更平展、高处更上仰） */
+         并按挂高做形态梯度（低处更平展、高处更上仰）；P1 每枝加 hash 抖动 */
       const childLayer = Math.min(child.layer ?? layer + 1, 6);
       const sameType = TYPE_OF_LAYER(layer) === TYPE_OF_LAYER(childLayer);
-      const tiltDeg = isExt
+      const baseTilt = isExt
         ? (sameType ? EXT_ANGLE_SAME : EXT_ANGLE_CROSS)
         : lateralAngle(childLayer) * (1.15 - 0.35 * t);
+      const jitterDeg = (child.hash - 0.5) * (isExt ? 14 : 18);
+      const tiltDeg = Math.max(4, Math.min(68, baseTilt + jitterDeg));
       const az = GOLDEN * i + child.hash * 1.5;
       const qTilt = new THREE.Quaternion().setFromAxisAngle(
         new THREE.Vector3(1, 0, 0), tiltDeg / (180 / Math.PI));

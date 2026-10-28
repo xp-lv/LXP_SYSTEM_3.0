@@ -1,12 +1,12 @@
 /* 纯逻辑单测（7号 §D：〔自〕断言全部进单测）
    只测零 DOM/零 three 的模块：data / persistence / slots / calendar。 */
-import {derive,makeTopTree,makeBareTree,allocId,seedIds,maxIdOf} from '../src/data.js';
+import {derive,makeTopTree,makeBareTree,allocId,seedIds,maxIdOf,setIdSalt} from '../src/data.js';
 import * as P from '../src/persistence.js';
 import {allocateTreeSlot,slotOf,releaseTreeSlot,TREE_CAP,crownScaleOf,islandRadiusOf} from '../src/slots.js';
-import {weekKeyOf,monthOf,dayCapOf,weekDays} from '../src/calendar.js';
-import {fallenFruits,leafPile} from '../src/queries.js';
+import {weekKeyOf,monthOf,dayCapOf,weekDays,isOverdue} from '../src/calendar.js';
+import {fallenFruits,leafPile,dayItems,pendingOverdue} from '../src/queries.js';
 import {snapNode,reviveNode} from '../src/rules.js';
-import {undo,redo,updateTask,updateTemp,addSubtask} from '../src/mutations.js';
+import {undo,redo,updateTask,updateTemp,addSubtask,bulkMakeup} from '../src/mutations.js';
 import {data} from '../src/state.js';
 
 let n=0,f=0;
@@ -31,6 +31,14 @@ t('makeBareTree 同样全局唯一',()=>{
 t('seedIds 回播后不回退',()=>{
   seedIds(999);eq(allocId(),1000);seedIds(5);eq(allocId(),1001);
 });
+t('跨端会话 id 段不撞车',()=>{
+  setIdSalt(1);const a=allocId(),b=allocId();
+  setIdSalt(2);const c=allocId();
+  if(a===b||a===c||b===c)throw new Error('id 段内/段间重复');
+  setIdSalt(1);seedIds(a);
+  if(allocId()!==b)throw new Error('seedIds 未回播本段');
+  setIdSalt(0);seedIds(100000);              /* 复位并抬高序号，避免后续用例复用旧 id */
+});
 
 console.log('[data] derive（bare/桶/进度）');
 t('bare=未排期未完成；排期/完成翻转',()=>{
@@ -46,6 +54,20 @@ t('无 abandoned 桶（6号 §C 四桶）',()=>{
   const r=makeTopTree('g',['a']).root;r.children[0].abandoned=true;derive(r);
   eq(r.buckets.abandoned,undefined);
 });
+t('derive 逾期按 makeup||assignD 派生；放弃不计逾期',()=>{
+  const r=makeTopTree('g',['a','b']).root;
+  const a=r.children[0],b=r.children[1];
+  a.assignD='2000-01-01';
+  b.assignD='2000-01-01';b.makeup='2999-01-01';
+  derive(r,'2026-10-28');
+  if(!(r.buckets.overdue>0))throw new Error('旧落日未计入逾期');
+  eq(a.redCount,1);
+  eq(b.redCount,0);
+  a.abandoned=true;
+  derive(r,'2026-10-28');
+  eq(r.buckets.overdue,0);
+  eq(a.redCount,0);
+});
 
 console.log('[persistence] 序列化/回环（派生不入档 G5）');
 t('roundtrip 保原子字段、丢派生',()=>{
@@ -59,6 +81,22 @@ t('roundtrip 保原子字段、丢派生',()=>{
   eq(back.children[0].checklist[0].t,'x');eq(back.children[0].checklist[0].done,true);
   eq(back._rec,undefined);eq(back.pos,undefined);
   derive(back);eq(back.pct,1);
+});
+t('abandoned 入档/回环（放弃状态不丢失）',()=>{
+  const r=makeTopTree('g',['a']).root;r.children[0].abandoned=true;
+  const back=P.deserializeTree(JSON.parse(JSON.stringify(P.serializeTree(r))));
+  eq(back.children[0].abandoned,true);
+});
+t('临时任务子级序列化/回环（05.6 执行区可恢复）',()=>{
+  const p={id:1,title:'父',hours:2,leaf:false,
+    children:[{id:2,title:'子',hours:1,assignD:'2026-10-27',leaf:true}]};
+  const s=P.serializeTemp(p);
+  if(s.children.length!==1)throw new Error('子级未入档');
+  const r=P.reviveTemp(s);
+  eq(r.children.length,1);
+  eq(r.children[0].id,2);
+  eq(r.children[0].assignD,'2026-10-27');
+  if(r.children[0].parent!==r)throw new Error('parent 未回链');
 });
 t('serializeWorld 结构=schema v2（domains/trees/island/active id/exec）',()=>{
   const doc=P.serializeWorld({domains:[{id:1,name:'d',color:2}],
@@ -109,6 +147,14 @@ t('dayCapOf 工作日/周末分桶',()=>{
   eq(dayCapOf(caps,'2026-10-12'),6);   /* 周一 */
   eq(dayCapOf(caps,'2026-10-18'),4);   /* 周日 */
 });
+t('isOverdue 按 makeup||assignD 与今天比较',()=>{
+  const n={leaf:true,progress:0,assignD:'2026-10-11'};
+  eq(isOverdue(n,'2026-10-12'),true);
+  n.makeup='2026-10-13';eq(isOverdue(n,'2026-10-12'),false);
+  n.makeup='2026-10-11';eq(isOverdue(n,'2026-10-12'),true);
+  n.progress=1;eq(isOverdue(n,'2026-10-12'),false);
+  n.progress=0;n.abandoned=true;eq(isOverdue(n,'2026-10-12'),false);
+});
 
 console.log('[mutations] undo/redo（G2：undo 到底=字节级还原）');
 t('updateTask 可撤销且字节级还原',()=>{
@@ -136,6 +182,25 @@ t('结构变更（addSubtask）可撤销',()=>{
   if(r.children[0].children.length!==1)throw new Error('未加');
   while(undo());
   eq(JSON.stringify(P.serializeTree(r)),before,'结构还原');
+});
+t('updateTask abandoned 可撤销（放弃状态入快照）',()=>{
+  const r=makeTopTree('g4',['a']).root;
+  data.root=r;
+  updateTask(r.children[0],{abandoned:true});
+  if(!r.children[0].abandoned)throw new Error('未放弃');
+  while(undo());
+  if(r.children[0].abandoned)throw new Error('undo 未恢复放弃状态');
+});
+t('bulkMakeup 批量补到同一天（全部补到今天）',()=>{
+  const r=makeTopTree('g5',['a','b']).root;
+  data.root=r;
+  r.children[0].assignD='2000-01-01';r.children[1].assignD='2000-01-02';
+  const n=bulkMakeup([r.children[0],r.children[1]],'2999-01-01');
+  eq(n,2);
+  eq(r.children[0].makeup,'2999-01-01');
+  eq(r.children[1].makeup,'2999-01-01');
+  derive(r,'2999-01-01');
+  if(isOverdue(r.children[0],'2999-01-01'))throw new Error('补到当天仍逾期');
 });
 
 console.log('[性能] 存档体积基准（N5）');
@@ -198,6 +263,24 @@ t('fallenFruits/leafPile：本周超时含 temp；过期补点在本周=落果�
   eq(fall.map(x=>x.id).sort((a,b)=>a-b),[L[0].id,L[4].id,9002].sort((a,b)=>a-b));
   const pile=leafPile([r],temps,'2026-10-11','2026-10-12');
   eq(pile.map(x=>x.id).sort((a,b)=>a-b),[L[2].id,9003].sort((a,b)=>a-b));
+});
+t('abandoned 从落果/落叶堆/今日清单排除',()=>{
+  const r=makeTopTree('g',['A','B','C']).root;
+  const [a,b,c]=r.children;
+  a.assignD='2026-10-11';a.abandoned=true;   /* 本周末完成但已放弃 */
+  b.assignD='2026-10-12';b.abandoned=true;   /* 今日但已放弃 */
+  c.assignD='2026-10-10';c.abandoned=true;   /* 历史欠账但已放弃 */
+  eq(fallenFruits([r],[],'2026-10-14','2026-10-12').length,0);
+  eq(leafPile([r],[],'2026-10-11','2026-10-12').length,0);
+  eq(dayItems([r],'2026-10-12',[]).length,0);
+});
+t('pendingOverdue 用有效落日且排除放弃（5点扫描口径）',()=>{
+  const r=makeTopTree('g',['a','b']).root;
+  r.children[0].assignD='2000-01-01';
+  r.children[1].assignD='2000-01-01';r.children[1].abandoned=true;
+  const out=pendingOverdue([r],'2026-10-28');
+  eq(out.length,1);
+  eq(out[0].id,r.children[0].id);
 });
 t('bare 不受 assignM 影响',()=>{
   const r=makeTopTree('g',['a']).root;

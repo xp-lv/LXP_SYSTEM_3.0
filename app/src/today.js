@@ -4,7 +4,7 @@ import {markRendered as viewsMark,showView} from './views.js';
 import {pickMeshes} from './state.js';
 import {scene} from './scene.js';
 import {data} from './state.js';
-import {updateTask,updateTemp,touch,addTemp,removeTemp} from './mutations.js';
+import {updateTask,updateTemp,touch,addTemp,removeTemp,bulkMakeup} from './mutations.js';
 import {notify} from './notify.js';
 import {today,dayLabel,weekKeyOf,weekDays,addDays,parse,dstr,dayCapOf,effD,effW} from './calendar.js';
 import {setWeek,ensureWeekCSS} from './weekview.js';
@@ -52,7 +52,7 @@ function execRestore(){
     /* 只恢复仍然存在的未完成任务 */
     _exec=st.items.filter(function(e){
       var n=nodeAnyById(e.nodeId);
-      return n&&n.progress<1;
+      return n&&!n.abandoned&&n.progress<1;
     }).map(function(e){
       return{nodeId:e.nodeId,startedAt:e.startedAt||Date.now(),
         decomposed:!!e.decomposed,editing:false,page:e.page||0};
@@ -103,8 +103,16 @@ function execRender(){
   var zone=document.getElementById('execZone');
   if(!zone)return;
   viewsMark();   /* 执行区显式渲染过——吞掉 50ms 内的 data 兜底重渲染（防输入框被重建） */
+  /* 清理失效执行项：已放弃/已完成/节点已不存在 */
+  var _before=_exec.length;
+  _exec=_exec.filter(function(e){
+    var n=nodeAnyById(e.nodeId);
+    return n&&!n.abandoned&&n.progress<1;
+  });
+  if(_exec.length!==_before)execSave();
   zone.classList.remove('collapsed');
   if(!_exec.length){
+    execTickStop();
     zone.innerHTML='<div class="ez-pill">⚡ 点击右侧清单任务开始执行</div>';   /* 空态药丸（05.6 v5） */
     return;
   }
@@ -252,9 +260,10 @@ function execRender(){
     });
   });
   updateTrailNav();
+  execTick();                                  /* 恢复/重渲染后重启计时（否则重载后计时停在首帧） */
 }
 function execTick(){
-  if(_execTimer)clearInterval(_execTimer);
+  if(_execTimer)return;
   _execTimer=setInterval(function(){
     if(!_exec.length)return;
     _exec.forEach(function(e){
@@ -265,6 +274,9 @@ function execTick(){
       }
     });
   },1000);
+}
+function execTickStop(){
+  if(_execTimer){clearInterval(_execTimer);_execTimer=null}
 }
 /* trail ‹ › 可用态校准（v11）：溢出才亮箭头；输入态自动贴最右 */
 function updateTrailNav(){
@@ -472,6 +484,20 @@ function injectCSS(){
 .mk-clear{grid-column:1/-1;font-size:10.5px;color:var(--lx-warn,#D9A13E);cursor:pointer;
   text-align:center;padding:5px 0;border:1px dashed rgba(217,161,62,.35);border-radius:6px;margin-top:4px}
 .mk-clear:hover{background:rgba(217,161,62,.1)}
+/* 补点弹层底部动作：完成 / 放弃（临时=删除）/ 全部补到今天 */
+.mk-acts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.mk-act{height:28px;border-radius:7px;border:1px solid var(--lx-line-2);cursor:pointer;
+  font:500 10.5px/1 inherit;color:var(--lx-text-2);background:var(--lx-bg-3,#080A10);
+  transition:all .15s;padding:0 6px;white-space:nowrap}
+.mk-act:hover{color:var(--lx-text-1);border-color:var(--lx-line-3)}
+.mk-act.ok{color:#4CC38A;border-color:rgba(76,195,138,.32);background:rgba(76,195,138,.07)}
+.mk-act.ok:hover{background:rgba(76,195,138,.13);border-color:rgba(76,195,138,.5)}
+.mk-act.abandon{color:#D9A13E;border-color:rgba(217,161,62,.32);background:rgba(217,161,62,.06)}
+.mk-act.abandon:hover{background:rgba(217,161,62,.13);border-color:rgba(217,161,62,.5)}
+.mk-act.del{color:#E5696F;border-color:rgba(229,105,111,.32);background:rgba(229,105,111,.06)}
+.mk-act.del:hover{background:rgba(229,105,111,.13);border-color:rgba(229,105,111,.5)}
+.mk-act.all{grid-column:1/-1;color:#5B9BE6;border-color:rgba(91,155,230,.32);background:rgba(91,155,230,.06)}
+.mk-act.all:hover{background:rgba(91,155,230,.13);border-color:rgba(91,155,230,.5)}
 /* ===== 落叶堆欠账面板 ===== */
 #backlogPanel{position:fixed;z-index:60;width:250px;max-height:60vh;overflow-y:auto;
   background:rgba(14,17,25,.94);backdrop-filter:blur(14px);border:1px solid var(--lx-line-2);
@@ -615,21 +641,36 @@ function injectCSS(){
   /* 补点选择器 DOM（05.3） */
   var ov=document.createElement('div');ov.className='mkp-overlay';ov.id='mkpOverlay';
   ov.innerHTML='<div class="mkp"><div class="mk-t"><i></i>补点到哪天？</div>'+
-    '<div class="mk-s" id="mkpSub"></div><div class="mk-grid" id="mkpGrid"></div></div>';
+    '<div class="mk-s" id="mkpSub"></div><div class="mk-grid" id="mkpGrid"></div>'+
+    '<div class="mk-acts" id="mkpActs"></div></div>';
   document.body.appendChild(ov);
   ov.addEventListener('click',function(e){if(e.target===ov)ov.classList.remove('open')});
 }
 
-/* ---------- 补点选择器（05.3/R18：覆盖更新、清除） ---------- */
+/* ---------- 补点选择器（05.3/R18：覆盖更新、清除；R33 历史日只读） ---------- */
 var mkpNode=null;
+/* 当前全部逾期/欠账（本周落果 + 历史落叶堆），去重——「全部补到今天」的作用集合 */
+function debtItems(t0,vw){
+  var list=q.fallenFruits(treeRoots(),data.temps,vw,t0.d)
+    .concat(q.leafPile(treeRoots(),data.temps,weekDays(t0.w)[0],t0.d));
+  var seen={},out=[];
+  list.forEach(function(n){
+    if(!n||seen[n.id])return;
+    seen[n.id]=1;out.push(n);
+  });
+  return out;
+}
 function openMkp(node){
   mkpNode=node;
   var ov=document.getElementById('mkpOverlay');
   if(!ov)return;
+  var isTemp=node.lvl==='temp';
   document.getElementById('mkpSub').textContent=node.title+' · '+
-    (node.hours||0)+'h · 原排期已过，选一天补做';
+    (node.hours||0)+'h · '+(_histRO?'历史日视角只读（R33）':
+      ('可选一天补做、直接完成'+(isTemp?'或删除':'或放弃')));
   var WD=['日','一','二','三','四','五','六'];
   var t0=today();
+  var vw=weekKeyOf(parse(t0.d));
   var h='';
   for(var w=0;w<2;w++)for(var d=0;d<7;d++){          /* 未来 14 天网格 */
     var dt=addDays(parse(t0.d),w*7+d);
@@ -647,6 +688,7 @@ function openMkp(node){
   document.getElementById('mkpGrid').innerHTML=h;
   ov.querySelectorAll('.mk-d').forEach(function(el){
     el.onclick=function(){
+      if(_histRO){notify.toast('历史日视角只读（R33）');return}
       /* R17：原排期冻结为历史锚点，新排期写 makeup（经变更服务） */
       writeMakeup(el.dataset.iso);
       ov.classList.remove('open');
@@ -655,7 +697,49 @@ function openMkp(node){
   });
   var mc=document.getElementById('mkClear');
   if(mc)mc.onclick=function(){
+    if(_histRO){notify.toast('历史日视角只读（R33）');return}
     writeMakeup(null);
+    ov.classList.remove('open');
+    enterToday();
+  };
+  /* 底部动作：完成 / 放弃（临时=删除）/ 全部补到今天 */
+  var acts='';
+  if(!_histRO){
+    var allN=debtItems(t0,vw).length;
+    acts='<button class="mk-act ok" id="mkDone">✓ 完成</button>'+
+      '<button class="mk-act '+(isTemp?'del':'abandon')+'" id="mkAbandon">'+(isTemp?'删除':'⊘ 放弃')+'</button>'+
+      '<button class="mk-act all" id="mkAllToday">全部补到今天'+(allN?'（'+allN+'）':'')+'</button>';
+  }
+  document.getElementById('mkpActs').innerHTML=acts;
+  var dn=document.getElementById('mkDone');
+  if(dn)dn.onclick=function(){
+    if(_histRO)return;
+    if(writeDone(mkpNode,true)){
+      ov.classList.remove('open');
+      enterToday();
+    }
+  };
+  var ab=document.getElementById('mkAbandon');
+  if(ab)ab.onclick=function(){
+    if(_histRO)return;
+    if(mkpNode.lvl==='temp'){
+      if(!confirm('删除此临时任务？'))return;
+      removeTemp(mkpNode.id);
+    }else{
+      if(!confirm('放弃「'+mkpNode.title+'」？\n将从今日清单、落果/落叶堆和逾期统计中移除；任务保留在树中，可随时恢复。'))return;
+      updateTask(mkpNode,{abandoned:true});
+    }
+    ov.classList.remove('open');
+    enterToday();
+  };
+  var all=document.getElementById('mkAllToday');
+  if(all)all.onclick=function(){
+    if(_histRO)return;
+    var t1=today();
+    var items=debtItems(t1,weekKeyOf(parse(t1.d)));
+    if(!items.length){ov.classList.remove('open');return}
+    if(!confirm('把当前所有逾期/欠账任务（'+items.length+' 项）全部补到今天？'))return;
+    bulkMakeup(items,t1.d);
     ov.classList.remove('open');
     enterToday();
   };
@@ -744,21 +828,25 @@ function buildWeekVTree(t0,vw){
   /* 保留真实层级：本周命中的节点作为顶层枝，其子树整体保留；
      叶子只负责状态（花/断梢/金叶），容器继续做枝干。 */
   function buildBranch(real){
+    if(real.abandoned)return null;
     if(!real.children||!real.children.length){
       var d=real.makeup||real.assignD||effD(real)||null;
       return wrap(real,isFallen(d,real.progress),vw);
     }
+    var kids=(real.children||[]).map(buildBranch).filter(Boolean);
+    if(!kids.length)return null;                 /* 子级全部已放弃：空容器不挂 */
     var node={id:real.id,title:real.title,depth:2,parent:null,children:[],
       leaf:false,hours:real.hours||0,progress:real.progress||0,overdue:false,
       lvl:real.lvl||'week',assignD:real.makeup||real.assignD||null,
       assignW:real.assignW||vw,makeup:real.makeup,order:real.order,
       checklist:real.checklist,_real:real};
-    node.children=real.children.map(buildBranch);
-    node.children.forEach(function(c){c.parent=node});
+    node.children=kids;
+    kids.forEach(function(c){c.parent=node});
     return node;
   }
   function collectTopWeek(n,out){
     (n.children||[]).forEach(function(c){
+      if(c.abandoned)return;
       if(isWeekTask(c)){out.push(c);return}
       if(c.children&&c.children.length)collectTopWeek(c,out);
     });
@@ -768,7 +856,8 @@ function buildWeekVTree(t0,vw){
     var tops=[];
     collectTopWeek(root,tops);
     tops.forEach(function(real){
-      var c=buildBranch(real);c.parent=goal;goal.children.push(c);
+      var c=buildBranch(real);if(!c)return;
+      c.parent=goal;goal.children.push(c);
     });
     if(goal.children.length)vroot.children.push(goal);      /* 空枝不挂 */
   });
@@ -1329,13 +1418,21 @@ function nodeByIdGlobal(id){
     if(r)return;(function w(n){if(n.id===id)r=n;n.children.forEach(w)})(root)})});
   return r;
 }
-/* 树节点 + 日程池（临时任务）通用查找（§8.2：清单含临时任务） */
+/* 树节点 + 日程池（临时任务）通用查找（§8.2：清单含临时任务；
+   临时任务支持子级，需递归查找——与 weekview.tempById 同口径） */
+function tempAnyById(list,id){
+  for(var i=0;i<(list||[]).length;i++){
+    var t=list[i];
+    if(t.id===id)return t;
+    var c=tempAnyById(t.children,id);
+    if(c)return c;
+  }
+  return null;
+}
 function nodeAnyById(id){
   var n=nodeByIdGlobal(id);
   if(n)return n;
-  var ts=data.temps||[];
-  for(var i=0;i<ts.length;i++)if(ts[i].id===id)return ts[i];
-  return null;
+  return tempAnyById(data.temps,id);
 }
 /* 完成/撤回写入（R28）：完成=盖戳（updateTask/updateTemp 内）；撤回=仅"今天完成的"可撤 */
 function writeDone(n,val){

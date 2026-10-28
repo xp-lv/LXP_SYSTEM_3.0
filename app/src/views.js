@@ -4,7 +4,7 @@ import {renderPlan} from './planner.js';
 import {renderWeek} from './weekview.js';
 import {enterToday,leaveToday,weekTreeMounted,setDay} from './today.js';
 import {store} from './store.js';
-import {undo,redo} from './mutations.js';
+import {undo,redo,renderIfDirty} from './mutations.js';
 
 /* —— data 事件 → 激活视图自动重渲染 ——
    显式渲染（页面在变更后主动调 renderXxx）会刷新 lastRenderAt；
@@ -177,6 +177,8 @@ export function showView(name){
   applyChrome(name);
   markRendered();
   state.renderPaused=(name==='plan'||name==='week');
+  /* 周/月期间跳过了 3D 重建；回到可见 3D 的视图时补建一次 */
+  if(name==='world'||name==='today')renderIfDirty();
   if(name==='world'){
     cv.style.display='block';
   }else if(name==='plan'){

@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 
-const CAP_WOOD = '#d9c9ae';
+const CAP_WOOD = '#c6ad86';
 
 function makeTexture(draw) {
   const cv = document.createElement('canvas');
@@ -20,35 +20,75 @@ let _TEX = null;
 function textures() {
   if (_TEX) return _TEX;
   _TEX = {
-    bud: makeTexture(g => {                       // 粉花苞：闭合粉色滴形 + 中缝 + 淡绿花萼
-      const gr = g.createRadialGradient(29, 25, 3, 32, 33, 22);
-      gr.addColorStop(0, '#ffd6e4'); gr.addColorStop(1, '#e57cab');
-      g.fillStyle = gr; g.beginPath(); g.ellipse(32, 31, 11, 17, 0, 0, 7); g.fill();
-      g.strokeStyle = 'rgba(205,90,130,.55)'; g.lineWidth = 2;
-      g.beginPath(); g.moveTo(32, 15); g.lineTo(32, 46); g.stroke();
-      g.fillStyle = '#86b060'; g.beginPath(); g.ellipse(32, 47, 8, 6, 0, 0, 7); g.fill();
+    bud: makeTexture(g => {                       // 花苞：闭合粉色滴形 + 中缝 + 淡绿花萼
+      const gr = g.createRadialGradient(29, 24, 2, 32, 34, 22);
+      gr.addColorStop(0, '#ffe6ee'); gr.addColorStop(.55, '#f4b3cb'); gr.addColorStop(1, '#d977a2');
+      g.fillStyle = gr;
+      g.beginPath(); g.ellipse(32, 31, 10.5, 17, 0, 0, 7); g.fill();
+      g.strokeStyle = 'rgba(190,95,135,.35)'; g.lineWidth = 1.4;
+      g.beginPath(); g.moveTo(32, 16); g.lineTo(32, 45); g.stroke();
+      const cal = g.createLinearGradient(0, 42, 0, 55);
+      cal.addColorStop(0, '#9cc472'); cal.addColorStop(1, '#6f9a4e');
+      g.fillStyle = cal;
+      g.beginPath(); g.ellipse(32, 48, 7.5, 6, 0, 0, 7); g.fill();
     }),
-    flower: makeTexture(g => {                    // 花：五瓣粉白 + 金芯
-      g.fillStyle = '#f6b9d2';
+    flower: makeTexture(g => {                    // 开放花：五瓣柔光 + 金蕊
+      const aura = g.createRadialGradient(32, 32, 3, 32, 32, 31);
+      aura.addColorStop(0, 'rgba(255,224,236,.42)');
+      aura.addColorStop(.55, 'rgba(255,200,222,.12)');
+      aura.addColorStop(1, 'rgba(255,200,222,0)');
+      g.fillStyle = aura; g.beginPath(); g.arc(32, 32, 31, 0, 7); g.fill();
       for (let k = 0; k < 5; k++) {
         g.save(); g.translate(32, 34); g.rotate(k * Math.PI * 2 / 5);
-        g.beginPath(); g.ellipse(0, -13, 8, 14, 0, 0, 7); g.fill(); g.restore();
+        const pg = g.createLinearGradient(0, -4, 0, -25);
+        pg.addColorStop(0, '#fff4f8');
+        pg.addColorStop(.55, '#f7c4d8');
+        pg.addColorStop(1, '#e58bb2');
+        g.fillStyle = pg;
+        g.beginPath();
+        g.moveTo(0, -3);
+        g.bezierCurveTo(9, -10, 12, -21, 0, -26);
+        g.bezierCurveTo(-12, -21, -9, -10, 0, -3);
+        g.fill();
+        g.strokeStyle = 'rgba(198,110,148,.22)'; g.lineWidth = .8;
+        g.beginPath(); g.moveTo(0, -6); g.lineTo(0, -23); g.stroke();
+        g.restore();
       }
-      g.fillStyle = '#fff3d6'; g.beginPath(); g.arc(32, 34, 6.5, 0, 7); g.fill();
+      const cg = g.createRadialGradient(32, 33, 1, 32, 33, 7);
+      cg.addColorStop(0, '#fff8d8'); cg.addColorStop(.55, '#f7d874'); cg.addColorStop(1, '#e5b544');
+      g.fillStyle = cg; g.beginPath(); g.arc(32, 33, 6, 0, 7); g.fill();
+      g.fillStyle = 'rgba(160,105,22,.5)';
+      for (let k = 0; k < 6; k++) {
+        const a = k * Math.PI / 3;
+        g.beginPath(); g.arc(32 + Math.cos(a) * 3.1, 33 + Math.sin(a) * 3.1, .65, 0, 7); g.fill();
+      }
     }),
-    gold: makeTexture(g => {                      // 金叶：旋转金椭圆 + 叶脉
-      const gr = g.createRadialGradient(32, 30, 3, 32, 34, 20);
-      gr.addColorStop(0, '#ffe98a'); gr.addColorStop(1, '#d99a12');
-      g.fillStyle = gr; g.save(); g.translate(32, 34); g.rotate(0.5);
-      g.beginPath(); g.ellipse(0, 0, 9, 17, 0, 0, 7); g.fill();
-      g.strokeStyle = 'rgba(160,100,0,.5)'; g.lineWidth = 2;
-      g.beginPath(); g.moveTo(0, -15); g.lineTo(0, 15); g.stroke(); g.restore();
+    gold: makeTexture(g => {                      // 金叶：尖叶形 + 叶脉
+      const gr = g.createLinearGradient(0, 2, 0, 62);
+      gr.addColorStop(0, '#fff4b8');
+      gr.addColorStop(.45, '#f6cb55');
+      gr.addColorStop(1, '#cf8f18');
+      g.fillStyle = gr;
+      g.beginPath(); g.moveTo(32, 3);
+      g.bezierCurveTo(54, 16, 52, 44, 32, 61);
+      g.bezierCurveTo(12, 44, 10, 16, 32, 3);
+      g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(150,95,10,.32)'; g.lineWidth = 1;
+      g.stroke();
+      g.strokeStyle = 'rgba(120,70,0,.32)'; g.lineWidth = 1.1;
+      g.beginPath(); g.moveTo(32, 7); g.lineTo(32, 57); g.stroke();
+      g.lineWidth = .7;
+      for (let i = 1; i <= 3; i++) {
+        const y = 12 + i * 10;
+        g.beginPath(); g.moveTo(32, y); g.lineTo(22, y + 6); g.stroke();
+        g.beginPath(); g.moveTo(32, y); g.lineTo(42, y + 6); g.stroke();
+      }
     }),
-    glow: makeTexture(g => {                      // 金团辉光
-      const gr = g.createRadialGradient(32, 32, 2, 32, 32, 30);
-      gr.addColorStop(0, 'rgba(255,224,110,.95)');
-      gr.addColorStop(0.5, 'rgba(250,196,60,.45)');
-      gr.addColorStop(1, 'rgba(250,196,60,0)');
+    glow: makeTexture(g => {                      // 金团辉光：更收敛的柔光
+      const gr = g.createRadialGradient(32, 32, 1, 32, 32, 30);
+      gr.addColorStop(0, 'rgba(255,239,175,.82)');
+      gr.addColorStop(.35, 'rgba(250,204,90,.3)');
+      gr.addColorStop(1, 'rgba(240,170,40,0)');
       g.fillStyle = gr; g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill();
     }),
   };
@@ -69,10 +109,12 @@ export function buildDecor(decor) {
   group.name = 'lxpDecor';
   const TEX = textures();
 
-  const sprite = (tex, pos, s) => {
+  const sprite = (tex, pos, s, opacity, color) => {
     const m = new THREE.Sprite(new THREE.SpriteMaterial({
       map: tex, transparent: true, depthWrite: false,
       toneMapped: false, // 宿主用 ACES 色调映射时保持 v2 的鲜艳度
+      opacity: opacity != null ? opacity : 1,
+      color: color != null ? color : 0xffffff,
     }));
     m.position.copy(pos);
     m.scale.setScalar(s);
@@ -80,62 +122,73 @@ export function buildDecor(decor) {
     return m;
   };
 
-  /* 物候 markers（三态 v3）：粉花苞/开放粉花（尺寸∝√工时，散布确定性）；
-     gold=单叶完成的小金团（辉光+金叶聚合，收敛分叉的大金团在下方 golds 段） */
+  /* 物候 markers（三态 v3）：粉花/花苞/小金叶簇；
+     gold=单叶完成的小金叶团（辉光+金叶聚合，收敛分叉的大金团在下方 golds 段） */
   for (const mk of decor.markers) {
     const jitter = hashOf(mk.origin.x, mk.origin.y, mk.origin.z);
     if (mk.type === 'gold') {
-      const size = 0.26 + 0.1 * Math.sqrt(mk.h);
-      const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: TEX.glow, transparent: true, depthWrite: false, opacity: 0.8,
-        toneMapped: false }));
-      glow.position.copy(mk.origin);
-      glow.scale.setScalar(size * 1.7);
-      group.add(glow);
-      for (let i = 0; i < 4; i++) {
+      const size = 0.15 + 0.045 * Math.sqrt(mk.h);
+      sprite(TEX.glow, mk.origin, size * 1.45, 0.18);
+      const count = 5 + Math.round(Math.min(4, Math.sqrt(mk.h)));
+      for (let i = 0; i < count; i++) {
         const a = i * 2.39996 + jitter * 6.28;
-        const rr = size * (0.18 + 0.3 * ((i * 0.618) % 1));
+        const rr = size * (0.10 + 0.32 * ((i * 0.618) % 1));
         sprite(TEX.gold,
           new THREE.Vector3(
             mk.origin.x + Math.cos(a) * rr,
-            mk.origin.y + ((i * 0.37 + jitter) % 1 - 0.5) * size * 0.9,
+            mk.origin.y + ((i * 0.37 + jitter) % 1 - 0.5) * size * 0.75,
             mk.origin.z + Math.sin(a) * rr),
-          size * (0.5 + 0.28 * ((i * 0.777) % 1)));
+          size * (0.38 + 0.26 * ((i * 0.777) % 1)), 0.95,
+          i % 3 === 0 ? 0xFFF0C0 : (i % 3 === 1 ? 0xFFFFFF : 0xFFE2A0));
       }
       continue;
     }
-    sprite(TEX[mk.type] ?? TEX.bud, mk.origin, 0.22 + 0.07 * Math.sqrt(mk.h) + 0.03 * jitter);
+    const isFlower = mk.type === 'flower';
+    const base = (isFlower ? 0.13 : 0.10) + (isFlower ? 0.035 : 0.025) * Math.sqrt(mk.h);
+    sprite(TEX[mk.type] ?? TEX.bud, mk.origin, base);
+    /* 小花簇：主花 + 一朵更小的花/花苞，避免单张大花“贴纸感” */
+    const n = isFlower ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      const a = jitter * 6.28 + (i + 1) * 2.39996;
+      const rr = base * (0.55 + 0.25 * ((i * 0.618) % 1));
+      const pos = new THREE.Vector3(
+        mk.origin.x + Math.cos(a) * rr,
+        mk.origin.y + (i === 0 ? 0.05 : -0.035) * base,
+        mk.origin.z + Math.sin(a) * rr);
+      sprite(i === 0 && isFlower ? TEX.flower : TEX.bud, pos,
+        base * (0.42 + 0.16 * ((i * 0.777) % 1)), 0.9);
+    }
   }
 
   /* 金叶团：辉光 + 金叶聚合（大小∝√完成工时，黄金角散布） */
   for (const gd of decor.golds) {
-    const size = Math.min(1.6, 0.3 + 0.16 * Math.sqrt(gd.hours));
-    const count = Math.min(18, 6 + Math.round(Math.sqrt(gd.hours) * 1.6));
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: TEX.glow, transparent: true, depthWrite: false, opacity: 0.85,
-      toneMapped: false }));
-    glow.position.copy(gd.origin);
-    glow.scale.setScalar(size * 1.5);
-    group.add(glow);
+    const size = Math.min(1.15, 0.22 + 0.12 * Math.sqrt(gd.hours));
+    const count = Math.min(16, 6 + Math.round(Math.sqrt(gd.hours) * 1.3));
+    sprite(TEX.glow, gd.origin, size * 1.35, 0.18);
     for (let i = 0; i < count; i++) {
       const a = i * 2.39996 + hashOf(gd.origin.x, gd.origin.y, gd.origin.z) * 6.28;
-      const rr = size * (0.15 + 0.45 * ((i * 0.618) % 1));
+      const rr = size * (0.08 + 0.36 * ((i * 0.618) % 1));
       sprite(TEX.gold,
         new THREE.Vector3(
           gd.origin.x + Math.cos(a) * rr,
           gd.origin.y + ((i * 0.37 + hashOf(gd.origin.z, gd.origin.x, gd.origin.y)) % 1 - 0.5) * size,
           gd.origin.z + Math.sin(a) * rr),
-        size * (0.4 + 0.35 * ((i * 0.777) % 1)));
+        size * (0.26 + 0.22 * ((i * 0.777) % 1)), 0.95,
+        i % 3 === 0 ? 0xFFF0C0 : (i % 3 === 1 ? 0xFFFFFF : 0xFFE2A0));
     }
   }
 
   /* 断口端盖：平齐浅木切面（面片法向对齐枝轴，微抬 1mm 防 z-fight） */
   const capTex = makeTexture(g => {
-    g.fillStyle = CAP_WOOD;
+    const gr = g.createRadialGradient(32, 32, 2, 32, 32, 31);
+    gr.addColorStop(0, '#d8c3a2');
+    gr.addColorStop(.65, CAP_WOOD);
+    gr.addColorStop(1, '#a98a62');
+    g.fillStyle = gr;
     g.fillRect(0, 0, 64, 64);
-    g.strokeStyle = 'rgba(120,98,70,.4)';
-    g.lineWidth = 2.4;
-    for (let r = 26; r > 3; r -= 5) { g.beginPath(); g.arc(32, 32, r, 0, 7); g.stroke(); }
+    g.strokeStyle = 'rgba(95,72,48,.28)';
+    g.lineWidth = 1.4;
+    for (let r = 27; r > 3; r -= 4) { g.beginPath(); g.arc(32, 32, r, 0, 7); g.stroke(); }
   });
   const capMat = new THREE.MeshStandardMaterial({ map: capTex, roughness: 1 });
   const capGeoCache = new Map();
@@ -143,7 +196,7 @@ export function buildDecor(decor) {
     const r = c.radius * 1.02;
     const key = r.toFixed(3);
     if (!capGeoCache.has(key)) {
-      capGeoCache.set(key, new THREE.CircleGeometry(r, 14));
+      capGeoCache.set(key, new THREE.CircleGeometry(r, 18));
     }
     const m = new THREE.Mesh(capGeoCache.get(key), capMat);
     const up = new THREE.Vector3(0, 1, 0).applyEuler(c.orientation).normalize();

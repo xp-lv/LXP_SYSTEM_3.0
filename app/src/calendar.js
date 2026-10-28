@@ -63,6 +63,14 @@ export const effM=n=>eff(n,x=>x.assignM);
 export const effW=n=>eff(n,x=>x.assignW);
 export const effD=n=>eff(n,x=>x.assignD);
 
+/** 展示层逾期：有效落日（补点优先）早于 dayKey，且未完成/未放弃。
+ *  n.overdue 是历史事实标志（R16/R17），不作为展示/统计口径。 */
+export function isOverdue(n,dayKey){
+  if(!n||!n.leaf||n.progress>=1||n.abandoned)return false;
+  const d=n.makeup||effD(n);
+  return !!d&&d<(dayKey||today().d);
+}
+
 /** 日容量：按星期取 caps.weekend / caps.day（caps 缺省 6h/0h）——周泡泡与今日顶带共用口径
  * @param {{day?:number,weekend?:number}|null} caps
  * @param {string} dayKey 'YYYY-MM-DD'

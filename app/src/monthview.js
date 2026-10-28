@@ -143,7 +143,8 @@ function buildVirtualTree(mk){
     if(c.children.length)w(c);
   })})(data.root);
   entries.forEach(function(entry){
-    var vnode={title:entry.title,_real:entry,children:[],lvl:entry.lvl,hours:entry.hours};
+    var vnode={title:entry.title,_real:entry,children:[],lvl:entry.lvl,hours:entry.hours,
+      abandoned:!!entry.abandoned,progress:entry.progress||0,leaf:!!entry.leaf};
     entry.children.forEach(function(mc){
       if(mc.lvl==='month'&&mc.assignM===mk)vnode.children.push(mc);
     });
@@ -263,6 +264,10 @@ export function renderDetail(){
       /* 10月虚拟根不可加；顶级任务 + 第一层月度任务可各分解一次 */
       return mvDepth(n)<=2;
     },
+    canAbandon:function(n){
+      var x=n._real||n;
+      return !!x&&x.leaf&&n.lvl!=='week'&&n.lvl!=='temp'&&!n._virtualRoot&&!n._group;
+    },
     ops:{
       divide:function(parent,fields){
         if(!parent||parent._virtualRoot)return null;
@@ -301,6 +306,14 @@ export function renderDetail(){
       setHours:function(node,h){
         if(node._real)updateTask(node._real,{hours:h});
         else updateTask(node,{hours:h});
+      },
+      abandon:function(node,on){
+        var target=node._real||node;
+        if(!target||!target.leaf)return;
+        if(on&&!confirm('放弃「'+target.title+'」？\n将从今日清单、落果/落叶堆和逾期统计中移除；任务保留在树中，可随时恢复。'))return;
+        updateTask(target,{abandoned:!!on});
+        renderDetail();
+        renderPlan();
       }
     },
     colorOf:function(n){return n._virtualRoot?null:colorOf(n._real||n)},
@@ -324,7 +337,7 @@ export function renderDetail(){
       else setSelected({mk:mk});
     },
     drag:{
-      canDrag:function(n){return n.lvl==='month'&&n.assignM===mk&&(!n.children||!n.children.length)},
+      canDrag:function(n){return !n.abandoned&&n.lvl==='month'&&n.assignM===mk&&(!n.children||!n.children.length)},
       dropSelector:'#mvWeekTrack .weekcloud',
       ghostText:function(n,el){
         return el

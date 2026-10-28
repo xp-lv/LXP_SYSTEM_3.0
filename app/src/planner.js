@@ -603,18 +603,24 @@ function renderCanvas(){
           return true;
         },
         rename:function(n,t){renameNode(n,t)},
-        setHours:function(n,h){updateTask(n,{hours:h})}
+        setHours:function(n,h){updateTask(n,{hours:h})},
+        abandon:function(n,on){
+          if(on&&!confirm('放弃「'+n.title+'」？\n将从今日清单、落果/落叶堆和逾期统计中移除；任务保留在树中，可随时恢复。'))return;
+          updateTask(n,{abandoned:!!on});
+          renderPlan();
+        }
       },
       /* 画布只显示根 + 2 层；更深层级折叠保留，不撑宽画布 */
       filter:function(n){return n.lvl!=='month'&&n.lvl!=='week'&&depthOfNode(n)<=2},
       /* 顶级目标最多3级：主目标/二级可再分解，三级封底 */
       canPlus:function(n){return depthOfNode(n)<2},
+      canAbandon:function(n){return n!==data.root&&n.leaf&&!n._virtualRoot&&!n._group},
       meta:canvasMeta,
       colorOf:function(n){return n===data.root?null:colorOf(n)},
       isSelected:function(n){return !!(selected&&selected.node===n)},
       onClick:function(n){selectForDetail(n)},
       drag:{
-        canDrag:function(n){return n!==data.root&&n.lvl!=='month'&&n.lvl!=='week'},
+        canDrag:function(n){return n!==data.root&&n.lvl!=='month'&&n.lvl!=='week'&&!n.abandoned},
         dropSelector:'#plMonthTrack .month-card',
         ghostText:function(n,mc){
           return mc

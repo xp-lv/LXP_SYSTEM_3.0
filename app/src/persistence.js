@@ -28,6 +28,7 @@ export function serializeTree(root){
     if(n.lvl)o.lvl=n.lvl;
     if(n.progress){o.progress=1;if(n.completedAt)o.completedAt=n.completedAt;}
     if(n.overdue)o.overdue=true;
+    if(n.abandoned)o.abandoned=true;
     if(n.assignM)o.assignM=n.assignM;
     if(n.assignW)o.assignW=n.assignW;
     if(n.assignD)o.assignD=n.assignD;
@@ -52,6 +53,7 @@ function revive(p,parent,depth){
   const n={id:p.id,title:p.title,depth:depth,parent:parent,
     children:[],leaf:!!p.leaf,
     progress:p.progress?1:0,overdue:!!p.overdue,
+    abandoned:!!p.abandoned,
     completedAt:p.completedAt||null,
     hours:p.hours!=null?+p.hours:2};
   if(p.lvl)n.lvl=p.lvl;

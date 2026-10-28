@@ -43,13 +43,13 @@ const MAX_LAYERS = 6;
 /* ---- 长度预算参数（demo 基准，阶段二随丛生端头微调） ---- */
 const KB = 0.24;                    // 根预算 = KB·√工时
 const BUDGET_MIN = 2.6, BUDGET_MAX = 6.5;
-const OWN_SHARE = [0.50, 0.50, 0.45, 0.45, 0.40, 0.40, 0.40]; // 各层自留比例
+const OWN_SHARE = [0.40, 0.50, 0.45, 0.45, 0.40, 0.40, 0.40]; // 各层自留比例（根更短→首侧枝下移）
 const ATTACH_END = 0.80;            // 与 tasktree 挂点带上限一致（避开收尖段）
 const WEIGHT_POW = 0.35;            // 子预算按工时份额的软化指数
 const MIN_REACH = 0.35;
 
 const TIP_R = 0.02;                 // 顶梢保底半径（父截面公式里的 +tip²）
-const R = h => 0.0115 * Math.sqrt(h); // 达芬奇：r ∝ √工时
+const R = h => 0.0125 * Math.sqrt(h); // 达芬奇：r ∝ √工时（P1：主干略增粗）
 
 /**
  * 任务树 → 建造规格。
@@ -131,6 +131,7 @@ export function prepareSpec(root, opts = {}) {
       }
       for (const c of spec.ch) area += c.entryR * c.entryR;
       spec.entryR = Math.sqrt(area);
+      if (depth === 0) spec.entryR = Math.max(spec.entryR, 0.055); // P1：主干半径保底
       /* 末端延续=延长枝（第一子）：出口径由它决定（旧链模型的"末子延续"公式已废） */
       const extR = spec.ch[0].entryR;
       spec.exitR = Math.sqrt(extR * extR + TIP_R * TIP_R);
@@ -174,7 +175,7 @@ export function pathToTip(spec) {
    老兄弟挂点永不移动（只追加不挪位）；越靠后的侧枝越贴近端头（丛生端头）。 */
 export function attachT(i, depth = 0) {
   if (i === 0) return 0.93;
-  const spread = 0.24 - 0.03 * Math.min(depth, 4); // 浅层铺得开，深层更抱端
+  const spread = 0.36 - 0.03 * Math.min(depth, 4); // P1：首侧枝下移、侧枝带更开；深层略抱端
   return ATTACH_END - spread * Math.pow(0.6, i - 1);
 }
 

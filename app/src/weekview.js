@@ -1,6 +1,6 @@
 import {state,data} from './state.js';
 import {addSubtask,updateTask,removeNode,renameNode,assignPeriod,unassignPeriod,touch,addTemp,removeTemp,reorderSibling,snapshot} from './mutations.js';
-import {weekKeyOf,weekDays,dayLabel,today,dstr,addDays,parse,monthOf,mstr,weekLabel,weekStripWeeks,effW,effD,dayCapOf} from './calendar.js';
+import {weekKeyOf,weekDays,dayLabel,today,dstr,addDays,parse,monthOf,mstr,weekLabel,weekStripWeeks,effW,effD,isOverdue,dayCapOf} from './calendar.js';
 import {getIslands,getActiveIsland,treeColorOf} from './world.js';
 import {escHtml} from './utils.js';
 import * as q from './queries.js';
@@ -27,7 +27,8 @@ function dayCap(dk){return dayCapOf(data.caps,dk)}
 
 function num(v){var n=parseFloat(v);return isNaN(n)?0:Math.max(0,Math.round(n*10)/10)}
 function isLeafN(n){return !(n.children&&n.children.length)}
-function sumH(n){return isLeafN(n)?(n.hours||0):n.children.reduce(function(s,c){return s+sumH(c)},0)}
+function sumH(n){if(n.abandoned)return 0;
+  return isLeafN(n)?(n.hours||0):n.children.reduce(function(s,c){return s+sumH(c)},0)}
 function treeOf(n){return q.treeOf(n)}
 function treeColor(n){
   if(n.lvl==='temp')return 'var(--lx-temp,#38BDF8)';
@@ -47,24 +48,29 @@ function weekGroupOf(n){
   return n&&n._wkGroup&&n._wkGroup.children.indexOf(n)>=0?n._wkGroup:null;
 }
 
-/* 临时任务：已落日的按周归属；未落日的属于全局日程池（当前/未来周可见可拖） */
-function tempPoolFor(wkKey,future){
-  return (data.temps||[]).filter(function(t){
-    if(t.assignD)return weekKeyOf(new Date(t.assignD.replace(/-/g,'/')))===wkKey;
-    return future;
-  });
-}
 /* 当日事项：落日叶子 + 补点在本日的 + 落日临时任务（容量照常计入）——口径统一于 queries */
 function dayItems(dk){return q.dayItems(allTreeRoots(),dk,data.temps)}
 function dayLoad(dk){return q.dayHours(allTreeRoots(),dk,data.temps)}
+/* 逾期未重排：展示层有效落日（补点优先）早于今天 → 红色感叹号；
+   补点/落日落到今天及以后 = 已重新安排，感叹号消除（本周内昨天未完成仍会标记）。
+   没有落日时才看有效周：历史周才标记；无任何排期=未排期（走原红点）。 */
+function isStaleOverdue(n){
+  if(!isLeafN(n)||n.progress>=1||n.abandoned)return false;
+  var t0=today();
+  if(isOverdue(n,t0.d))return true;
+  var day=n.makeup||effD(n);
+  if(day)return false;
+  var w=effW(n);
+  return !!w&&w<t0.w;
+}
 function wkLabel(k){
   var mon=parse(k);mon=addDays(mon,-3);
   var sun=addDays(mon,6);
   return (mon.getMonth()+1)+'/'+mon.getDate()+' \u2013 '+(sun.getMonth()+1)+'/'+sun.getDate();
 }
-function wkOfKey(dk){return weekKeyOf(new Date(dk.replace(/-/g,'/')))}
-
-/* ---------- 虚拟树：根「本周」→ 目标分组 → 周任务（真实节点直挂） ---------- */
+/* ---------- 虚拟树：根「本周」→ 目标分组 → 完整任务层级 ----------
+   周规划页要能看见整棵任务树（不只是一周子集）：所有顶层任务及其子级都入画布，
+   再按各自排期展示；未落日叶子在画布上以断梢形态标记。 */
 function buildWeekTree(wkKey,future){
   var vroot={title:wkLabel(wkKey),children:[],_virtualRoot:true};
   /* 清掉上一轮渲染留下的组引用，避免已移出本周的节点继续用旧组排序 */
@@ -72,16 +78,7 @@ function buildWeekTree(wkKey,future){
     (function clr(n){n._wkGroup=null;(n.children||[]).forEach(clr)})(tr);
   });
   allTreeRoots().forEach(function(tr){
-    var list=[];
-    (function w(n){
-      n.children.forEach(function(c){
-        /* 所有“有效周=本周”的任务都入画布，不再只限 month/week：
-           顶层任务、周任务、只分配到周未落日的任务都要显示。 */
-        var inWk=effW(c)===wkKey||(c.makeup&&wkOfKey(c.makeup)===wkKey);
-        if(inWk){list.push(c);return}   /* 命中即收；其分解子级由画布递归呈现 */
-        if(c.children.length)w(c);
-      });
-    })(tr);
+    var list=(tr.children||[]).slice();
     if(list.length){
       list.sort(function(a,b){
         var ao=a.wOrder,bo=b.wOrder;
@@ -95,7 +92,7 @@ function buildWeekTree(wkKey,future){
       vroot.children.push(group);
     }
   });
-  var temps=tempPoolFor(wkKey,future);
+  var temps=(data.temps||[]).slice();
   if(temps.length)vroot.children.push({title:'日程',_group:true,_temp:true,lvl:'temp',children:temps});
   return vroot;
 }
@@ -307,7 +304,8 @@ export function renderWeek(dir){
   renderedWk=wk;
   var vroot=buildWeekTree(wk,!_ro);
   var taskN=0,totH=0;
-  vroot.children.forEach(function(g){g.children.forEach(function(t){taskN++;totH+=t.hours||0})});
+  vroot.children.forEach(function(g){g.children.forEach(function(t){
+    if(t.abandoned)return;taskN++;totH+=t.hours||0})});
 
   el.innerHTML='<div class="wk-canvas'+(dir>0?' wk-go-r':dir<0?' wk-go-l':'')+'">'+
     '<div class="wk-head">'+
@@ -318,7 +316,7 @@ export function renderWeek(dir){
     '<div class="wk-title num">'+wkLabel(wk)+
     (isCur?'<span class="wk-chip cur">本周</span>':'')+
     (_ro?'<span class="wk-chip ro">历史周 · 只读</span>':'')+'</div>'+
-    '<div class="wk-sub num">'+taskN+' 个周任务 · '+Math.round(totH)+'h'+
+    '<div class="wk-sub num">'+taskN+' 个任务 · '+Math.round(totH)+'h'+
     (vroot.children.length>1?' · '+vroot.children.length+' 组':'')+'</div></div>'+
     /* 周度条平铺到日期范围右侧（原底部整行上收，跨月连续导航不变） */
     '<div class="wk-weeks" id="wkWeeks"></div>'+
@@ -352,11 +350,11 @@ export function renderWeek(dir){
   dcInst=createDecomposer(document.getElementById('wkCanvasArea'),{
     data:vroot,
     height:'100%',
-    hint:vroot.children.length?'':'本周暂无排程任务——点右上「＋临时任务」，或在宏观/今日页把任务排到本周',
+    hint:vroot.children.length?'':'暂无任务——点右上「＋临时任务」，或在宏观/今日页添加任务',
     padBottom:12,    /* 日分配列在布局流内，底部只留呼吸空间 */
     hoursEditable:!_ro,
     canPlus:function(n){
-      return !_ro&&!n._virtualRoot&&!n._group&&
+      return !_ro&&!n.abandoned&&!n._virtualRoot&&!n._group&&
         (n.hours||0)>0&&weekDepth(n)<2;
     },
     ops:{
@@ -397,34 +395,49 @@ export function renderWeek(dir){
         if(node.lvl==='temp'){node.hours=hv;touch()}
         else updateTask(node,{hours:hv});
         setTimeout(refreshDayRail,0);          /* 工时变化 → 波浪水位即时更新 */
+      },
+      abandon:function(node,on){
+        if(_ro)return;
+        if(on&&!confirm('放弃「'+node.title+'」？\n将从今日清单、落果/落叶堆和逾期统计中移除；任务保留在树中，可随时恢复。'))return;
+        updateTask(node,{abandoned:!!on});
+        renderWeek();
+        setTimeout(refreshDayRail,0);
       }
     },
     colorOf:function(n){return n._virtualRoot?null:treeColor(n._real||n)},
     meta:function(n){
-      if(n._virtualRoot)return taskN+' 个周任务';
+      if(n._virtualRoot)return taskN+' 个任务';
       if(n._group){
         if(n._temp)return '临时 \u00b7 '+n.children.length;
-        var s=0;n.children.forEach(function(t){s+=t.hours||0});
-        return n.children.length+'任务 \u00b7 '+Math.round(s)+'h';
+        var s=0,cnt=0;n.children.forEach(function(t){
+          if(t.abandoned)return;cnt++;s+=t.hours||0});
+        return cnt+'任务 \u00b7 '+Math.round(s)+'h';
       }
       var leaf=isLeafN(n);
       /* 容器工时=子级汇总（自身 hours 是分解前的旧值，不再展示） */
       var hv=leaf?(n.hours||0):sumH(n);
       var hrs=hv>0?Math.round(hv)+'h'
         :'<span style="color:var(--lx-warn,#D9A13E)">填工时</span>';
-      var h=(!_ro&&leaf)?'<span class="hz" data-role="h">'+hrs+'</span>':hrs;
+      var h=(!_ro&&leaf&&!n.abandoned)?'<span class="hz" data-role="h">'+hrs+'</span>':hrs;
       /* 落日信息：容器（有子任务）不显示——落日发生在叶子层；
-         叶子未落日不写"待落日"文字，由卡片右上角红点（badge）承载 */
+         未落日叶子不再用红点，而是明确的「断梢」形态（虚线残桩 + 标签） */
       var day;
       if(n.makeup)day='<span style="color:var(--lx-warn,#D9A13E)">补 '+n.makeup.slice(5)+'</span>';
       else if(effD(n))day=dayLabel(effD(n)).split(' ')[0]+' '+effD(n).slice(8);
       else day=null;
-      return day?(h+' \u00b7 '+day):h;
+      var body=day?(h+' \u00b7 '+day):h;
+      var tip=leaf&&!n.abandoned&&n.progress<1&&!n.makeup&&!effD(n);
+      if(tip)body='<span style="color:#FF6A5A">断梢</span> \u00b7 '+body;
+      return n.abandoned?('已放弃 \u00b7 '+body):body;
     },
-    badge:function(n){return isLeafN(n)&&!n.makeup&&!effD(n)},   /* 未落日红点 */
+    brokenTip:function(n){return isLeafN(n)&&!n.abandoned&&n.progress<1&&!n.makeup&&!effD(n)}, /* 未落日：断梢形态 */
+    alert:function(n){return isStaleOverdue(n)},   /* 逾期未重排：红色感叹号 */
+    canAbandon:function(n){
+      return !_ro&&isLeafN(n)&&n.lvl!=='temp'&&!n._virtualRoot&&!n._group;
+    },
     drag:{
       canDrag:function(n){
-        if(_ro||n._virtualRoot||n._group)return false;
+        if(_ro||n._virtualRoot||n._group||n.abandoned)return false;
         /* 本周画布上的所有真实叶子都可拖到日期列；不再限 month/week */
         return isLeafN(n);
       },
@@ -432,7 +445,7 @@ export function renderWeek(dir){
       ghostText:function(n,el){
         if(!(n.hours>0))return n.title+' 未填工时 · 落日前须补';
         if(!el)return n.title+' → 拖到日期列';
-        var isMk=!!(n.overdue&&n.progress<1);
+        var isMk=isStaleOverdue(n);
         var load=dayLoad(el.dataset.dk),cap=dayCap(el.dataset.dk);
         var full=load+(n.hours||0)>cap;
         return n.title+' → '+(isMk?'补 ':'')+dayLabel(el.dataset.dk).split(' ')[0]+' '+
@@ -444,7 +457,7 @@ export function renderWeek(dir){
           toast('warn','「'+n.title+'」未填工时 · 点击工时补填后落日');
           return;
         }
-        if(n.overdue&&n.progress<1)updateTask(n,{makeup:el.dataset.dk});
+        if(isStaleOverdue(n))updateTask(n,{makeup:el.dataset.dk});
         else assignPeriod(n,'d',el.dataset.dk);
         renderWeek();
         splashBubble(document.querySelector('#wkDayRail .wk-day[data-dk="'+el.dataset.dk+'"]'));
@@ -454,7 +467,7 @@ export function renderWeek(dir){
     },
     reorder:{
       canReorder:function(n){
-        if(_ro||n._virtualRoot||n._group)return false;
+        if(_ro||n._virtualRoot||n._group||n.abandoned)return false;
         if(n.lvl==='temp')return true;
         /* 顶层目标组内：不要求真实父级相同，所有周任务都可调顺序 */
         if(weekGroupOf(n))return true;
@@ -793,7 +806,7 @@ function onWkDragMove(e){
     _ghost.innerHTML=escHtml(wkDrag.n.title)+' <b>未填工时 \u00b7 落日前须补</b>';
     return;
   }
-  var isMk=!!(wkDrag.n.overdue&&wkDrag.n.progress<1);   /* 逾期任务重排 → 补点 */
+  var isMk=isStaleOverdue(wkDrag.n);   /* 逾期任务重排 → 补点 */
   var load=col?dayLoad(col.dataset.dk):0;
   var dcap=dayCap(col.dataset.dk);var full=load+(wkDrag.n.hours||0)>dcap;
   _ghost.innerHTML=escHtml(wkDrag.n.title)+' <b>\u2192 '+
@@ -819,7 +832,7 @@ function onWkDragUp(e){
   var col=bubbleAt(e.clientX,e.clientY);
   if(col){
     /* 逾期任务原排期冻结为历史锚点，重排只写补点（§8.1） */
-    if(d.n.overdue&&d.n.progress<1)updateTask(d.n,{makeup:col.dataset.dk});
+    if(isStaleOverdue(d.n))updateTask(d.n,{makeup:col.dataset.dk});
     else assignPeriod(d.n,'d',col.dataset.dk);
     renderWeek();
     splashBubble(document.querySelector('#wkDayRail .wk-day[data-dk="'+col.dataset.dk+'"]'));
@@ -847,7 +860,7 @@ function onStripMove(e){
   _ghost.style.display='block';
   _ghost.style.left=(e.clientX+14)+'px';
   _ghost.style.top=(e.clientY-10)+'px';
-  var isMk=!!(stripDrag.n.overdue&&stripDrag.n.progress<1);
+  var isMk=isStaleOverdue(stripDrag.n);
   var curDay=isMk?(stripDrag.n.makeup||effD(stripDrag.n)):effD(stripDrag.n);
   _ghost.innerHTML=escHtml(stripDrag.n.title)+' <b>'+
     (col?(col.dataset.dk===curDay?'同一天':(isMk?'补 ':'')+dayLabel(col.dataset.dk).split(' ')[0]+' '+col.dataset.dk.slice(8))
@@ -864,7 +877,7 @@ function onStripUp(e){
     c.classList.remove('drop-in')});
   if(!d.moved)return;
   var col=bubbleAt(e.clientX,e.clientY);
-  var isMk=!!(d.n.overdue&&d.n.progress<1);
+  var isMk=isStaleOverdue(d.n);
   var curDay=isMk?(d.n.makeup||effD(d.n)):effD(d.n);
   if(col){
     if(col.dataset.dk===curDay)return;

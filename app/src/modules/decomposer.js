@@ -145,6 +145,31 @@ export function createDecomposer(container, opts){
 .dc-node .n-x:hover{color:var(--lx-danger,#E5696F);background:rgba(229,105,111,.10)}
 .dc-node .n-dot{position:absolute;right:5px;top:5px;width:6px;height:6px;border-radius:50%;
   background:#FF5A4E;pointer-events:none}   /* 宿主 badge：未落日红点 */
+/* 宿主警示徽标：逾期未重新排期（红色感叹号，压在卡片右上角外沿） */
+.dc-node .n-alert{position:absolute;right:-8px;top:-8px;width:17px;height:17px;border-radius:50%;
+  background:#F5222D;color:#fff;font:800 11px/17px -apple-system,'Segoe UI',sans-serif;
+  text-align:center;z-index:4;pointer-events:none;
+  box-shadow:0 0 0 2px var(--bd-surface,#151922),0 2px 8px rgba(245,34,45,.5)}
+/* 已完成：左上角大拇指徽标（周/月/宏观画布通用） */
+.dc-node .n-done{position:absolute;left:-9px;top:-9px;width:20px;height:20px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;
+  background:var(--bd-surface,#151922);border:1px solid rgba(76,195,138,.6);
+  box-shadow:0 0 0 2px var(--bd-surface,#151922),0 2px 8px rgba(76,195,138,.35);
+  z-index:4;pointer-events:none}
+/* 已放弃：虚线 + 降透明度 + 名称划线；悬停仍可恢复 */
+.dc-node.abandoned{opacity:.55;border-style:dashed}
+.dc-node.abandoned:hover{opacity:.82}
+.dc-node.abandoned .n-name{text-decoration:line-through;color:var(--bd-text-3,#6E7689)}
+/* 断梢：未落日叶子的残桩形态（虚线右缘 + 红色断口） */
+.dc-node.broken-tip{border-right:2px dashed rgba(255,90,74,.55)}
+.dc-node.broken-tip::after{content:'';position:absolute;right:-9px;top:50%;transform:translateY(-50%);
+  width:9px;height:2px;border-radius:1px;
+  background:repeating-linear-gradient(90deg,#FF5A4E 0 2px,transparent 2px 4px);
+  box-shadow:0 0 6px rgba(255,90,74,.3);pointer-events:none}
+.dc-node .n-abandon{display:none;position:absolute;right:23px;top:1px;font-size:12px;
+  color:var(--bd-text-3,#6E7689);cursor:pointer;line-height:1;padding:2px 4px;border-radius:4px;z-index:3}
+.dc-node:hover .n-abandon,.dc-node.sel .n-abandon{display:block}
+.dc-node .n-abandon:hover{color:#D9A13E;background:rgba(217,161,62,.12)}
 .dc-newrow{position:absolute;transform:translateY(-50%);z-index:2}
 .dc-newrow input{background:var(--bd-surface-3,#11151C);border:1px solid var(--bd-line,rgba(255,255,255,.10));
   border-radius:var(--bd-r-node,10px);color:var(--bd-text,#E9ECF4);padding:7px 11px;font-size:12px;
@@ -356,13 +381,18 @@ export function createDecomposer(container, opts){
     const meta=o.meta?o.meta(n):defaultMeta(n);
     const sel=o.isSelected&&o.isSelected(n)?' sel':'';
     const branch=o.colorOf?o.colorOf(n):null;
-    return '<div class="dc-node'+(n===root?' root':'')+(n._virtualRoot?' dc-virtual':'')+(isLane?' dc-lane':'')+sel+
+    const broken=!!(o.brokenTip&&o.brokenTip(n));
+    return '<div class="dc-node'+(n===root?' root':'')+(n._virtualRoot?' dc-virtual':'')+(isLane?' dc-lane':'')+(n.abandoned?' abandoned':'')+(broken?' broken-tip':'')+sel+
       '" data-i="'+i+'" data-depth="'+d+'" style="left:'+x+'px;top:'+y+'px;'+(isLane?'transform:none':'')+
       (isLane&&n._laneColor?';--cc:'+n._laneColor:'')+(branch?';--dc-c:'+branch:'')+'">'+
       '<div class="n-name" title="'+esc(n.title)+' · 双击改名">'+esc(n.title)+'</div>'+
+      ((n.leaf&&n.progress>=1&&!n.abandoned)?'<span class="n-done" title="已完成">👍</span>':'')+
       '<div class="n-meta">'+meta+'</div>'+
       ((o.badge&&o.badge(n))?'<span class="n-dot" title="未落日"></span>':'')+
-      ((!o.canPlus||o.canPlus(n))?'<span class="n-plus" data-role="plus" title="加子级">＋</span>':'')+
+      ((o.alert&&o.alert(n))?'<span class="n-alert" title="已逾期 · 补到今天或以后即消除">!</span>':'')+
+      ((o.canAbandon&&o.canAbandon(n))?'<span class="n-abandon" data-role="abandon" title="'+
+        (n.abandoned?'恢复任务':'放弃任务')+'">'+(n.abandoned?'↺':'⊘')+'</span>':'')+
+      ((!n.abandoned&&(!o.canPlus||o.canPlus(n)))?'<span class="n-plus" data-role="plus" title="加子级">＋</span>':'')+
       (n!==root?'<span class="n-x" data-role="x" title="删除">×</span>':'')+
       '</div>';
   }
@@ -474,6 +504,14 @@ export function createDecomposer(container, opts){
         xx.addEventListener('pointerdown',e=>e.stopPropagation());
         xx.onclick=function(e){e.stopPropagation();opRemove(n)};
       }
+      const ab=nd.querySelector('[data-role="abandon"]');
+      if(ab){
+        ab.addEventListener('pointerdown',e=>e.stopPropagation());
+        ab.onclick=function(e){
+          e.stopPropagation();
+          if(o.ops&&o.ops.abandon)o.ops.abandon(n,!n.abandoned);
+        };
+      }
       const hh=nd.querySelector('[data-role="h"]');
       if(hh&&o.hoursEditable)hh.addEventListener('click',function(e){
         e.stopPropagation();
@@ -481,7 +519,7 @@ export function createDecomposer(container, opts){
       });
       /* 单击（非拖拽） */
       nd.addEventListener('click',function(e){
-        if(e.target.closest('.n-plus,.n-x,.dc-input'))return;
+        if(e.target.closest('.n-plus,.n-x,.n-abandon,.dc-input'))return;
         if(Date.now()-dragEndAt<350)return;
         if(o.onClick)o.onClick(n);
       });
@@ -489,7 +527,7 @@ export function createDecomposer(container, opts){
       if(o.drag){
         nd.addEventListener('pointerdown',function(e){
           if(e.button!==0)return;
-          if(e.target.closest('.n-plus,.n-x')||e.target.tagName==='INPUT')return;
+          if(e.target.closest('.n-plus,.n-x,.n-abandon')||e.target.tagName==='INPUT')return;
           const canAssign=!o.drag.canDrag||o.drag.canDrag(n);
           const canFree=!!o.drag.free&&(!o.drag.canFreeDrag||o.drag.canFreeDrag(n));
           const canReorder=!!o.reorder&&(!o.reorder.canReorder||o.reorder.canReorder(n));
